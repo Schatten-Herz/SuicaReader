@@ -32,7 +32,6 @@ import androidx.compose.ui.draw.blur
 import com.example.suicareader.ui.theme.LocalStrings
 import com.example.suicareader.ui.theme.LocalTextColor
 
-import androidx.compose.animation.SharedTransitionScope.ResizeMode
 import androidx.compose.foundation.lazy.rememberLazyListState
 
 @OptIn(ExperimentalSharedTransitionApi::class)
