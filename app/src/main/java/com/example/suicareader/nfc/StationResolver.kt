@@ -35,15 +35,42 @@ object StationResolver {
         val lineHex = "%02X".format(lineCode)
         val staHex = "%02X".format(stationCode)
         
-        // 尝试 Area-Line-Station 精确匹配
         if (regionCode != null) {
             val areaHex = "%02X".format(regionCode)
             val fullKey = "$areaHex-$lineHex-$staHex"
             map[fullKey]?.let { return it }
         }
         
-        // 降级使用 Line-Station 匹配
         val shortKey = "$lineHex-$staHex"
         return map[shortKey]
+    }
+
+    fun searchStations(query: String, companyFilter: String? = null): List<Pair<String, String>> {
+        val map = stations ?: return emptyList()
+        return map.entries
+            .filter { (_, name) -> 
+                val matchesQuery = query.isBlank() || name.contains(query, ignoreCase = true)
+                val matchesCompany = companyFilter == null || name.contains(companyFilter, ignoreCase = true)
+                matchesQuery && matchesCompany
+            }
+            .map { it.key to it.value }
+            .take(50) // Limit results for performance
+    }
+
+    fun getAllCompanies(): List<String> {
+        // We know names are "StationName (CompanyName)"
+        // This is a naive extraction for demonstration
+        val map = stations ?: return emptyList()
+        val companies = mutableSetOf<String>()
+        map.values.forEach { name ->
+            val start = name.indexOf('(')
+            val end = name.indexOf(')')
+            if (start != -1 && end != -1 && start < end) {
+                val companyAndLine = name.substring(start + 1, end)
+                val company = companyAndLine.split(" ").firstOrNull() ?: companyAndLine
+                companies.add(company)
+            }
+        }
+        return companies.sorted().take(20) // Provide top 20 or we could hardcode popular ones
     }
 }

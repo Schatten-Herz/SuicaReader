@@ -29,6 +29,12 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.draw.blur
 
+import com.example.suicareader.ui.theme.LocalStrings
+import com.example.suicareader.ui.theme.LocalTextColor
+
+import androidx.compose.animation.SharedTransitionScope.ResizeMode
+import androidx.compose.foundation.lazy.rememberLazyListState
+
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun DashboardScreen(
@@ -38,6 +44,9 @@ fun DashboardScreen(
     onCardClick: (String) -> Unit
 ) {
     val cards by viewModel.cards.collectAsState()
+    val strings = LocalStrings.current
+    val textColor = LocalTextColor.current
+
     val cardToEdit = remember { mutableStateOf<com.example.suicareader.data.db.entity.TransitCard?>(null) }
     val cardToDelete = remember { mutableStateOf<String?>(null) } // Used for confirmation dialog
 
@@ -50,27 +59,33 @@ fun DashboardScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.fillMaxSize().blur(blurRadius)) {
-            LiquidBackground()
+            // LiquidBackground() removed, hoisted to MainScreen
 
             Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
                 Text(
-                    text = "My Cards",
-                    color = Color.White,
+                    text = strings.dashboardTitle,
+                    color = textColor,
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(top = 48.dp, bottom = 24.dp)
                 )
 
+                val listState = rememberLazyListState()
+
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    state = listState,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(bottom = 80.dp)
                 ) {
-                    items(cards) { card ->
+                    items(cards.size) { i ->
+                        val card = cards[i]
                         with(sharedTransitionScope) {
                             GlassCard(
-                                modifier = Modifier.sharedElement(
-                                    rememberSharedContentState(key = "card-${card.idm}"),
-                                    animatedVisibilityScope = animatedVisibilityScope
-                                ),
+                                modifier = Modifier
+                                    .sharedBounds(
+                                        rememberSharedContentState(key = "card-${card.idm}"),
+                                        animatedVisibilityScope = animatedVisibilityScope
+                                    ),
                                 onClick = { onCardClick(card.idm) },
                                 onLongClick = { cardToEdit.value = card } // Changed to show menu
                             ) {
@@ -91,12 +106,18 @@ fun DashboardScreen(
                                         )
                                     }
                                     Spacer(modifier = Modifier.weight(1f))
-                                    Text(
-                                        text = "¥${card.balance}",
-                                        color = Color.White,
-                                        fontSize = 32.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    with(sharedTransitionScope) {
+                                        Text(
+                                            text = "¥${card.balance}",
+                                            color = Color.White,
+                                            fontSize = 32.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.sharedBounds(
+                                                rememberSharedContentState(key = "balance_${card.idm}"),
+                                                animatedVisibilityScope = animatedVisibilityScope
+                                            )
+                                        )
+                                    }
                                 }
                             }
                         }

@@ -15,7 +15,7 @@ data class TripRecord(
     val id: Long = 0,
     val cardIdm: String, // 关联的卡片 IDm
     val timestamp: Long, // 交易时间 (秒或毫秒)
-    val type: String, // 交易类型，如 "Fare", "Charge"
+    val type: Int, // 交易类型，如 0x01 (Fare), 0x02 (Charge)
     val inStation: String, // 进站代码或名称
     val outStation: String, // 出站代码或名称
     val inStationName: String?, // 解析后的真实进站名称

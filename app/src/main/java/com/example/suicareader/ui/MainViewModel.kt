@@ -49,7 +49,7 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
                     com.example.suicareader.data.db.entity.TripRecord(
                         cardIdm = idmHex,
                         timestamp = timestamp,
-                        type = parsed.transactionType.toString(),
+                        type = parsed.transactionType,
                         inStation = parsed.inStationCode,
                         outStation = parsed.outStationCode,
                         inStationName = parsed.inStationName,
@@ -82,6 +82,47 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
                 )
                 cardDao.updateCard(updated)
             }
+        }
+    }
+
+    fun addManualTrip(
+        idm: String,
+        type: Int,
+        amount: Int,
+        inStationCode: String,
+        inStationName: String,
+        outStationCode: String?,
+        outStationName: String?
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val currentCards = cards.value
+            val card = currentCards.find { it.idm == idm } ?: return@launch
+            
+            val newBalance = card.balance + amount
+            val timestamp = System.currentTimeMillis()
+            val blockHex = "MANUAL-$timestamp"
+            
+            // Extract the actual line-station hex code from the key (e.g. "00-01-01" -> "01-01")
+            val inCode = inStationCode.split("-").takeLast(2).joinToString("-")
+            val outCode = outStationCode?.split("-")?.takeLast(2)?.joinToString("-") ?: ""
+            
+            val newTrip = com.example.suicareader.data.db.entity.TripRecord(
+                cardIdm = idm,
+                timestamp = timestamp,
+                type = type,
+                inStation = inCode,
+                outStation = outCode,
+                inStationName = inStationName,
+                outStationName = outStationName,
+                amount = amount,
+                balance = newBalance,
+                blockHex = blockHex
+            )
+            
+            cardDao.insertTrips(listOf(newTrip))
+            
+            val updatedCard = card.copy(balance = newBalance, lastUpdated = timestamp)
+            cardDao.updateCard(updatedCard)
         }
     }
 
