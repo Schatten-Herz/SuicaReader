@@ -42,7 +42,8 @@ data class AppStrings(
     val cardNameLabel: String,
     val cardNumberLabel: String,
     val cardNumberPlaceholder: String,
-    val tripHistory: String
+    val tripHistory: String,
+    val balanceLabel: String
 )
 
 val EnStrings = AppStrings(
@@ -83,7 +84,8 @@ val EnStrings = AppStrings(
     cardNameLabel = "Card Name",
     cardNumberLabel = "Card Number (Last 4 digits)",
     cardNumberPlaceholder = "Optional",
-    tripHistory = "Trip History"
+    tripHistory = "Trip History",
+    balanceLabel = "Balance"
 )
 
 val ZhStrings = AppStrings(
@@ -124,7 +126,8 @@ val ZhStrings = AppStrings(
     cardNameLabel = "卡片名称",
     cardNumberLabel = "卡号尾数 (后四位)",
     cardNumberPlaceholder = "选填",
-    tripHistory = "行程记录"
+    tripHistory = "行程记录",
+    balanceLabel = "余额"
 )
 
 val JaStrings = AppStrings(
@@ -165,7 +168,8 @@ val JaStrings = AppStrings(
     cardNameLabel = "カード名",
     cardNumberLabel = "カード番号 (下4桁)",
     cardNumberPlaceholder = "任意",
-    tripHistory = "利用履歴"
+    tripHistory = "利用履歴",
+    balanceLabel = "残高"
 )
 
 val LocalStrings = staticCompositionLocalOf { EnStrings }

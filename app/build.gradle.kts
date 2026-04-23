@@ -14,7 +14,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.suicareader"
-        minSdk = 33
+        minSdk = 30
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -59,6 +59,10 @@ dependencies {
     
     // Material Icons Extended
     implementation("androidx.compose.material:material-icons-extended")
+    
+    // Reorderable list
+    implementation("sh.calvin.reorderable:reorderable:2.4.2")
+
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

@@ -92,17 +92,15 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
         inStationCode: String,
         inStationName: String,
         outStationCode: String?,
-        outStationName: String?
+        outStationName: String?,
+        timestamp: Long // User selected date's timestamp
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             val currentCards = cards.value
             val card = currentCards.find { it.idm == idm } ?: return@launch
             
-            val newBalance = card.balance + amount
-            val timestamp = System.currentTimeMillis()
-            val blockHex = "MANUAL-$timestamp"
+            val blockHex = "MANUAL-${System.currentTimeMillis()}"
             
-            // Extract the actual line-station hex code from the key (e.g. "00-01-01" -> "01-01")
             val inCode = inStationCode.split("-").takeLast(2).joinToString("-")
             val outCode = outStationCode?.split("-")?.takeLast(2)?.joinToString("-") ?: ""
             
@@ -115,15 +113,53 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
                 inStationName = inStationName,
                 outStationName = outStationName,
                 amount = amount,
-                balance = newBalance,
+                balance = 0, // Will be recalculated
                 blockHex = blockHex
             )
             
             cardDao.insertTrips(listOf(newTrip))
             
-            val updatedCard = card.copy(balance = newBalance, lastUpdated = timestamp)
-            cardDao.updateCard(updatedCard)
+            // Recalculate all balances
+            recalculateBalances(idm)
         }
+    }
+
+    fun reorderTripsWithinDay(idm: String, reorderedTrips: List<com.example.suicareader.data.db.entity.TripRecord>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            if (reorderedTrips.isEmpty()) return@launch
+
+            // Give them new timestamps based on their base date but offset by a millisecond to preserve the new order
+            // Assuming reorderedTrips are sorted from newest to oldest in the UI
+            val baseTime = reorderedTrips.last().timestamp
+            val updatedTrips = reorderedTrips.reversed().mapIndexed { index, trip ->
+                trip.copy(timestamp = baseTime + index)
+            }
+
+            cardDao.updateTrips(updatedTrips)
+
+            // Recalculate balances after reordering
+            recalculateBalances(idm)
+        }
+    }
+
+    private suspend fun recalculateBalances(idm: String) {
+        val allTrips = cardDao.getTripsListForCard(idm) // ordered ascending (oldest to newest)
+        if (allTrips.isEmpty()) return
+        
+        // Get the current known total balance of the card to work backwards from
+        val currentCards = cards.value
+        val card = currentCards.find { it.idm == idm } ?: return
+        
+        var currentBalance = card.balance
+        
+        // Iterate backwards (from newest to oldest) to calculate correct balances
+        val updatedTrips = allTrips.reversed().map { trip ->
+            val tripWithBalance = trip.copy(balance = currentBalance)
+            currentBalance -= trip.amount
+            tripWithBalance
+        }.reversed() // Reverse back to original order for updating if needed
+        
+        cardDao.updateTrips(updatedTrips)
     }
 
     fun getTripsForCard(idm: String) = cardDao.getTripsForCard(idm)

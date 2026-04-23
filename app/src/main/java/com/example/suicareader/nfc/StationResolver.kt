@@ -73,4 +73,17 @@ object StationResolver {
         }
         return companies.sorted().take(20) // Provide top 20 or we could hardcode popular ones
     }
+    val majorBusCompanies = listOf(
+        "Toei Bus (都営バス)", "Keio Bus (京王バス)", "Kanto Bus (関東バス)", "Seibu Bus (西武バス)",
+        "Tobu Bus (東武バス)", "Odakyu Bus (小田急バス)", "Tokyu Bus (東急バス)", "Keisei Bus (京成バス)",
+        "Kanagawa Chuo Kotsu (神奈川中央交通)", "Kokusai Kogyo Bus (国際興業バス)", "Kyoto City Bus (京都市バス)",
+        "Osaka City Bus (大阪シティバス)", "Nagoya City Bus (名古屋市営バス)", "Fukuoka Nishitetsu Bus (西鉄バス)",
+        "JR Bus Kanto (JRバス関東)", "JR Bus Tohoku (JRバス東北)", "JR Bus Tokai (JR東海バス)"
+    )
+
+    fun searchBusCompanies(query: String): List<String> {
+        return majorBusCompanies.filter { 
+            query.isBlank() || it.contains(query, ignoreCase = true) 
+        }
+    }
 }

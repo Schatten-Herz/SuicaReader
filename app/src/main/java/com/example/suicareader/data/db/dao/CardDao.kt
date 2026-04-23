@@ -22,8 +22,14 @@ interface CardDao {
     @Query("SELECT * FROM trip_records WHERE cardIdm = :idm ORDER BY timestamp DESC, id DESC")
     fun getTripsForCard(idm: String): Flow<List<TripRecord>>
 
+    @Query("SELECT * FROM trip_records WHERE cardIdm = :idm ORDER BY timestamp ASC, id ASC")
+    suspend fun getTripsListForCard(idm: String): List<TripRecord>
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertTrips(trips: List<TripRecord>)
+
+    @androidx.room.Update
+    suspend fun updateTrips(trips: List<TripRecord>)
 
     @Query("DELETE FROM transit_cards WHERE idm = :idm")
     suspend fun deleteCard(idm: String)

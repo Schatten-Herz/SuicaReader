@@ -81,6 +81,7 @@ fun DashboardScreen(
                         with(sharedTransitionScope) {
                             GlassCard(
                                 modifier = Modifier
+                                    .aspectRatio(1.586f)
                                     .sharedBounds(
                                         rememberSharedContentState(key = "card-${card.idm}"),
                                         animatedVisibilityScope = animatedVisibilityScope
@@ -89,10 +90,14 @@ fun DashboardScreen(
                                 onLongClick = { cardToEdit.value = card } // Changed to show menu
                             ) {
                                 Column {
+                                    // Golden ratio applied
+                                    val balanceSize = 32.sp
+                                    val nicknameSize = balanceSize / 1.618f // ~19.8sp
+
                                     Text(
                                         text = card.nickname,
                                         color = Color.White,
-                                        fontSize = 24.sp,
+                                        fontSize = nicknameSize,
                                         fontWeight = FontWeight.SemiBold
                                     )
                                     if (!card.displayNumber.isNullOrBlank()) {
@@ -104,12 +109,16 @@ fun DashboardScreen(
                                             letterSpacing = 2.sp
                                         )
                                     }
-                                    Spacer(modifier = Modifier.weight(1f))
+                                    
+                                    // Golden ratio spacing: top spacing is ~0.618, bottom spacing is 1.0 (Wait, they are pushed apart)
+                                    // To place the content at golden ratio points, we distribute the blank space
+                                    Spacer(modifier = Modifier.weight(1.618f))
+                                    
                                     with(sharedTransitionScope) {
                                         Text(
                                             text = "¥${card.balance}",
                                             color = Color.White,
-                                            fontSize = 32.sp,
+                                            fontSize = balanceSize,
                                             fontWeight = FontWeight.Bold,
                                             modifier = Modifier.sharedBounds(
                                                 rememberSharedContentState(key = "balance_${card.idm}"),

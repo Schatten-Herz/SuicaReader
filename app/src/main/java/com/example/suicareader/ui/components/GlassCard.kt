@@ -47,7 +47,6 @@ fun GlassCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(220.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale

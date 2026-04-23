@@ -3,33 +3,38 @@ package com.example.suicareader.ui.screens
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
-import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.lerp
+import com.example.suicareader.data.db.entity.TripRecord
 import com.example.suicareader.ui.MainViewModel
 import com.example.suicareader.ui.components.GlassCard
-import com.example.suicareader.ui.components.LiquidBackground
-
 import com.example.suicareader.ui.theme.LocalStrings
 import com.example.suicareader.ui.theme.LocalTextColor
-
-import androidx.compose.ui.draw.blur
-import androidx.compose.animation.core.animateDpAsState
-
+import sh.calvin.reorderable.*
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -53,130 +58,296 @@ fun CardDetailsScreen(
         label = "blur"
     )
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    val dbTrips by viewModel.getTripsForCard(cardIdm).collectAsState(initial = emptyList())
+    
+    var currentTrips by remember { mutableStateOf<List<TripRecord>>(emptyList()) }
+    
+    LaunchedEffect(dbTrips) {
+        currentTrips = dbTrips
+    }
 
-        Column(modifier = Modifier.fillMaxSize().blur(blurRadius)) {
-            Spacer(modifier = Modifier.height(48.dp))
-            IconButton(onClick = onBackClick) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = textColor)
-            }
+    val lazyListState = rememberLazyListState()
+    
+    // Flattened list for the LazyColumn
+    val flattenedList = remember(currentTrips) {
+        val list = mutableListOf<Any>()
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val grouped = currentTrips.groupBy { dateFormat.format(Date(it.timestamp)) }
+        grouped.forEach { (date, trips) ->
+            list.add(date) // Date Header
+            list.addAll(trips)
+        }
+        list
+    }
 
-            with(sharedTransitionScope) {
-                GlassCard(
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .sharedBounds(
-                            rememberSharedContentState(key = "card-$cardIdm"),
-                            animatedVisibilityScope = animatedVisibilityScope
-                        ),
-                    onClick = { /* 可做翻转动画 */ }
-                ) {
-                    Column {
-                        Text(
-                            text = card?.nickname ?: "Unknown Card",
-                            color = Color.White,
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(modifier = Modifier.weight(1f))
-                        
-                        Text(
-                            text = "¥${card?.balance ?: 0}",
-                            color = Color.White,
-                            fontSize = 48.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.sharedBounds(
-                                rememberSharedContentState(key = "balance_$cardIdm"),
-                                animatedVisibilityScope = animatedVisibilityScope
-                            )
-                        )
-                    }
-                }
-            }
-
-            Text(
-                text = strings.tripHistory,
-                color = textColor,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-
-            val trips by viewModel.getTripsForCard(cardIdm).collectAsState(initial = emptyList())
-
-            // 行程记录瀑布流
-            LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(trips.size) { index ->
-                    val trip = trips[index]
-                    val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
-                    val dateString = dateFormat.format(java.util.Date(trip.timestamp))
-                    
-                    val transactionName = when (trip.type) {
-                        0x01 -> "Fare (Subway)"
-                        0x02 -> "Charge (Top-up)"
-                        0x0F -> "Bus Fare"
-                        0x46 -> "Purchase (Vending/Store)"
-                        else -> "Transaction (0x${"%02X".format(trip.type)})"
-                    }
-                    
-                    val amountColor = if (trip.amount > 0) Color(0xFF4CAF50) else Color(0xFFE53935)
-                    val amountPrefix = if (trip.amount > 0) "+" else ""
-                    
-                    val inDisplay = trip.inStationName ?: trip.inStation
-                    val outDisplay = trip.outStationName ?: trip.outStation
-
-                    val detailText = when (trip.type) {
-                        0x02 -> "Location: $inDisplay" // Charge
-                        0x0F -> "Bus Route/ID: $inDisplay" // Bus
-                        0x46 -> "Terminal: $inDisplay" // Purchase
-                        else -> "In: $inDisplay\nOut: $outDisplay" // Subway/Train
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color.White.copy(alpha = 0.1f))
-                            .padding(16.dp)
-                    ) {
-                        Column {
-                            Text(dateString, color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(transactionName, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(detailText, color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp, maxLines = 2)
-                                }
-                                
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text("$amountPrefix¥${trip.amount}", color = amountColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                                    Text("Balance: ¥${trip.balance}", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp)
-                                }
+    val reorderableState = rememberReorderableLazyColumnState(lazyListState) { from, to ->
+        val fromItem = from.key as? String ?: return@rememberReorderableLazyColumnState
+        val toItem = to.key as? String ?: return@rememberReorderableLazyColumnState
+        
+        // Key format is "trip_${id}" or "header_${date}"
+        if (fromItem.startsWith("trip_") && toItem.startsWith("trip_")) {
+            val fromId = fromItem.removePrefix("trip_").toLongOrNull()
+            val toId = toItem.removePrefix("trip_").toLongOrNull()
+            
+            if (fromId != null && toId != null) {
+                val fromTrip = currentTrips.find { it.id == fromId }
+                val toTrip = currentTrips.find { it.id == toId }
+                
+                if (fromTrip != null && toTrip != null) {
+                    val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                    if (dateFormat.format(Date(fromTrip.timestamp)) == dateFormat.format(Date(toTrip.timestamp))) {
+                        val fromIndex = currentTrips.indexOfFirst { it.id == fromId }
+                        val toIndex = currentTrips.indexOfFirst { it.id == toId }
+                        if (fromIndex != -1 && toIndex != -1) {
+                            currentTrips = currentTrips.toMutableList().apply {
+                                add(toIndex, removeAt(fromIndex))
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    val density = LocalDensity.current
+
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val maxWidthDp = maxWidth
+        val maxCardHeightDp = (maxWidthDp - 32.dp) / 1.586f // ISO/IEC 7810 ID-1 ratio
+        val minCardHeightDp = 120.dp // Increased to prevent clipping of balance text
+        
+        // Calculate collapse fraction (0f = expanded, 1f = collapsed)
+        // Use derived state to avoid unnecessary recompositions if only scroll changes
+        val scrollOffsetPx by remember {
+            derivedStateOf {
+                if (lazyListState.firstVisibleItemIndex == 0) {
+                    lazyListState.firstVisibleItemScrollOffset.toFloat()
+                } else {
+                    Float.MAX_VALUE
+                }
+            }
+        }
+        
+        val maxScrollPx = with(density) { (maxCardHeightDp - minCardHeightDp).toPx() }
+        val rawFraction = if (maxScrollPx > 0) scrollOffsetPx / maxScrollPx else 0f
+        val collapseFraction = rawFraction.coerceIn(0f, 1f)
+        
+        val currentCardHeightDp = lerp(maxCardHeightDp, minCardHeightDp, collapseFraction)
+        
+        Box(modifier = Modifier.fillMaxSize().blur(blurRadius)) {
+            
+            // Trip History List
+            LazyColumn(
+                state = lazyListState,
+                // Pad the top so the first item starts below the expanded header
+                contentPadding = PaddingValues(
+                    top = 110.dp + maxCardHeightDp + 32.dp, 
+                    bottom = 100.dp, 
+                    start = 16.dp, 
+                    end = 16.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Background spacer inside the list is NOT needed since we use padding
+                
+                items(flattenedList, key = { item ->
+                    when (item) {
+                        is String -> "header_$item"
+                        is TripRecord -> "trip_${item.id}"
+                        else -> item.hashCode().toString()
+                    }
+                }) { item ->
+                    when (item) {
+                        is String -> {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Text(
+                                    text = item,
+                                    color = textColor.copy(alpha = 0.8f),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
+                                )
+                                HorizontalDivider(color = textColor.copy(alpha = 0.2f), modifier = Modifier.padding(bottom = 8.dp))
+                            }
+                        }
+                        is TripRecord -> {
+                            ReorderableItem(reorderableState, key = "trip_${item.id}") { isDragging ->
+                                val transactionName = when (item.type) {
+                                    0x01 -> strings.fareSubway
+                                    0x02 -> strings.chargeTopUp
+                                    0x0F, 0x0D -> strings.busFare
+                                    0x46 -> strings.purchase
+                                    else -> "Transaction (0x${"%02X".format(item.type)})"
+                                }
+                                
+                                val amountColor = if (item.amount > 0) Color(0xFF4CAF50) else Color(0xFFE53935)
+                                val amountPrefix = if (item.amount > 0) "+" else ""
+                                
+                                val inDisplay = item.inStationName ?: item.inStation
+                                val outDisplay = item.outStationName ?: item.outStation
+
+                                val detailText = when (item.type) {
+                                    0x02 -> "${strings.locationPrefix} $inDisplay"
+                                    0x0F, 0x0D -> "${strings.busRoutePrefix} $inDisplay"
+                                    0x46 -> "${strings.terminalPrefix} $inDisplay"
+                                    else -> "${strings.inPrefix} $inDisplay\n${strings.outPrefix} $outDisplay"
+                                }
+
+                                val scale by animateFloatAsState(
+                                    targetValue = if (isDragging) 0.95f else 1f,
+                                    label = "drag_scale"
+                                )
+
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .scale(scale)
+                                        .longPressDraggableHandle(
+                                            onDragStarted = { },
+                                            onDragStopped = { 
+                                                // Save changes to DB when drag stops
+                                                val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                                                val dateStr = dateFormat.format(Date(item.timestamp))
+                                                val dayTrips = currentTrips.filter { dateFormat.format(Date(it.timestamp)) == dateStr }
+                                                viewModel.reorderTripsWithinDay(cardIdm, dayTrips)
+                                            }
+                                        ),
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = Color.White.copy(alpha = if (isDragging) 0.3f else 0.1f)
+                                    )
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(transactionName, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(detailText, color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp, maxLines = 2)
+                                        }
+                                        
+                                        Column(horizontalAlignment = Alignment.End) {
+                                            Text("$amountPrefix¥${item.amount}", color = amountColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text("${strings.balanceLabel} ¥${item.balance}", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } // End of LazyColumn
+            
+            // Sticky Header Container (Top Overlays)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(110.dp + maxCardHeightDp + 48.dp) // Cover the expanded header area
+            ) {
+                // Background for the header to blend smoothly with list
+                if (collapseFraction > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                androidx.compose.ui.graphics.Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color(0xFF121212).copy(alpha = collapseFraction * 0.8f),
+                                        Color(0xFF121212).copy(alpha = collapseFraction * 0.4f),
+                                        Color.Transparent
+                                    )
+                                )
+                            )
+                    )
+                }
+
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Spacer(modifier = Modifier.height(48.dp))
+                    IconButton(onClick = onBackClick) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = textColor)
+                    }
+
+                    with(sharedTransitionScope) {
+                        GlassCard(
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp)
+                                .height(currentCardHeightDp)
+                                .sharedBounds(
+                                    rememberSharedContentState(key = "card-$cardIdm"),
+                                    animatedVisibilityScope = animatedVisibilityScope
+                                ),
+                            onClick = { /* Flip animation placeholder */ }
+                        ) {
+                            // Golden ratio applied to typography
+                            val expandedBalanceSize = 48.sp
+                            val expandedNicknameSize = expandedBalanceSize / 1.618f // ~29.6sp
+                            val collapsedBalanceSize = 28.sp
+                            val collapsedNicknameSize = collapsedBalanceSize / 1.618f // ~17.3sp
+                            
+                            val nicknameSize = lerp(expandedNicknameSize, collapsedNicknameSize, collapseFraction)
+                            val balanceSize = lerp(expandedBalanceSize, collapsedBalanceSize, collapseFraction)
+                            
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = card?.nickname ?: "Unknown Card",
+                                    color = Color.White,
+                                    fontSize = nicknameSize,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                
+                                Text(
+                                    text = "¥${card?.balance ?: 0}",
+                                    color = Color.White,
+                                    fontSize = balanceSize,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.sharedBounds(
+                                        rememberSharedContentState(key = "balance_$cardIdm"),
+                                        animatedVisibilityScope = animatedVisibilityScope
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    // Trip History Title
+                    val textAlpha = (1f - (collapseFraction * 2f)).coerceIn(0f, 1f)
+                    val textHeight = lerp(40.dp, 0.dp, collapseFraction)
+                    
+                    if (textAlpha > 0f) {
+                        Text(
+                            text = strings.tripHistory,
+                            color = textColor.copy(alpha = textAlpha),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp)
+                                .padding(top = 16.dp, bottom = 8.dp)
+                                .height(textHeight)
+                        )
+                    }
+                }
+            }
+        }
+
         if (showManualEntry) {
             com.example.suicareader.ui.components.ManualEntryDialog(
                 onDismiss = { showManualEntry = false },
-                onSubmit = { type, amount, inStationCode, inStationName, outStationCode, outStationName ->
-                    viewModel.addManualTrip(cardIdm, type, amount, inStationCode, inStationName, outStationCode, outStationName)
+                onSubmit = { type, amount, inStationCode, inStationName, outStationCode, outStationName, timestamp ->
+                    viewModel.addManualTrip(cardIdm, type, amount, inStationCode, inStationName, outStationCode, outStationName, timestamp)
                     showManualEntry = false
                 }
             )
         }
 
-        // FAB to add manual trip
         Box(
             modifier = Modifier.fillMaxSize().padding(24.dp),
             contentAlignment = Alignment.BottomEnd
