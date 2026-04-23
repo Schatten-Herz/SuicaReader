@@ -49,15 +49,11 @@ fun MainScreen(
     val bottomNavController = rememberNavController()
     val navBackStackEntry by bottomNavController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: "dashboard"
-
-    val isDarkTheme by themeViewModel.isDarkTheme.collectAsState()
-    val baseColor = if (isDarkTheme) Color(0xFF1E1E1E) else Color(0xFFF5F5F7)
     
     val strings = LocalStrings.current
     val textColor = LocalTextColor.current
 
     Box(modifier = Modifier.fillMaxSize()) {
-        LiquidBackground(baseColor = baseColor)
 
         Scaffold(
             containerColor = Color.Transparent,
@@ -101,58 +97,112 @@ fun GlassBottomBar(
     settingsText: String,
     onNavigate: (String) -> Unit
 ) {
+    val selectedIndex = if (currentRoute == "dashboard") 0 else 1
+    val indicatorOffset by androidx.compose.animation.core.animateDpAsState(
+        targetValue = (selectedIndex * (100 + 8)).dp,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessLow
+        ),
+        label = "indicator"
+    )
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(Color.White.copy(alpha = 0.15f))
-            .border(
-                width = 1.dp,
-                brush = Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.5f),
-                        Color.White.copy(alpha = 0.05f)
-                    ),
-                    start = Offset(0f, 0f),
-                    end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
-                ),
-                shape = RoundedCornerShape(24.dp)
-            )
-            .padding(horizontal = 24.dp, vertical = 12.dp)
+            .padding(bottom = 24.dp, start = 16.dp, end = 16.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically
+        Box(
+            modifier = Modifier
+                .height(64.dp) // Fixed height for consistency
+                .clip(RoundedCornerShape(50))
+                .background(Color.White.copy(alpha = 0.1f))
+                .border(
+                    width = 1.dp,
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.3f),
+                            Color.White.copy(alpha = 0.05f)
+                        ),
+                        start = Offset(0f, 0f),
+                        end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+                    ),
+                    shape = RoundedCornerShape(50)
+                )
+                .padding(6.dp) // Padding for the indicator to breathe
         ) {
-            val dashboardSelected = currentRoute == "dashboard"
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.clickable { onNavigate("dashboard") }
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Home,
-                    contentDescription = dashboardText,
-                    tint = if (dashboardSelected) textColor else textColor.copy(alpha = 0.5f),
-                    modifier = Modifier.size(28.dp)
-                )
-                Text(dashboardText, color = if (dashboardSelected) textColor else textColor.copy(alpha = 0.5f), fontSize = 12.sp)
-            }
+            // Animated Indicator Pill
+            Box(
+                modifier = Modifier
+                    .offset(x = indicatorOffset)
+                    .width(100.dp)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.White.copy(alpha = 0.2f))
+            )
 
-            val settingsSelected = currentRoute == "settings"
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.clickable { onNavigate("settings") }
+            Row(
+                modifier = Modifier.fillMaxHeight(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = settingsText,
-                    tint = if (settingsSelected) textColor else textColor.copy(alpha = 0.5f),
-                    modifier = Modifier.size(28.dp)
+                BottomNavItem(
+                    icon = Icons.Default.Home,
+                    label = dashboardText,
+                    selected = selectedIndex == 0,
+                    textColor = textColor,
+                    onClick = { onNavigate("dashboard") }
                 )
-                Text(settingsText, color = if (settingsSelected) textColor else textColor.copy(alpha = 0.5f), fontSize = 12.sp)
+
+                BottomNavItem(
+                    icon = Icons.Default.Settings,
+                    label = settingsText,
+                    selected = selectedIndex == 1,
+                    textColor = textColor,
+                    onClick = { onNavigate("settings") }
+                )
             }
         }
+    }
+}
+
+@Composable
+fun BottomNavItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    selected: Boolean,
+    textColor: Color,
+    onClick: () -> Unit
+) {
+    val contentColor = if (selected) textColor else textColor.copy(alpha = 0.6f)
+    
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+        modifier = Modifier
+            .width(100.dp)
+            .fillMaxHeight()
+            .clip(RoundedCornerShape(50))
+            .clickable { onClick() }
+    ) {
+        // 微调视觉重心，增加 2dp 顶部间距
+        Spacer(modifier = Modifier.height(2.dp))
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = contentColor,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = label, 
+            color = contentColor, 
+            fontSize = 12.sp, 
+            fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Normal,
+            style = androidx.compose.ui.text.TextStyle(
+                platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)
+            )
+        )
     }
 }

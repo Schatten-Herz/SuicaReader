@@ -2,15 +2,15 @@
 /build
 /.gradle
 
-# IDE 配置文件 (非常重要，否则别人下载后可能打不开)
+# IDE 配置文件
 /.idea
 *.iml
 *.iws
 
-# 本地环境变量 (包含你的电脑路径，绝对不能传)
+# 本地环境变量
 local.properties
 
-# 签名文件 (刚才生成的 jks 文件千万不能传！)
+# 签名文件
 *.jks
 *.keystore
 *.p12

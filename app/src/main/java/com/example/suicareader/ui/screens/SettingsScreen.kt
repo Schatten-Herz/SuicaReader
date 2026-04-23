@@ -25,7 +25,6 @@ import androidx.compose.material3.DropdownMenuItem
 @Composable
 fun SettingsScreen(themeViewModel: ThemeViewModel = androidx.lifecycle.viewmodel.compose.viewModel()) {
     val context = LocalContext.current
-    val isDarkTheme by themeViewModel.isDarkTheme.collectAsState()
     val currentLang by themeViewModel.currentLanguage.collectAsState()
     
     val strings = LocalStrings.current
@@ -39,38 +38,6 @@ fun SettingsScreen(themeViewModel: ThemeViewModel = androidx.lifecycle.viewmodel
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(top = 48.dp, bottom = 24.dp)
         )
-
-        // Dark Theme Switch
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color.White.copy(alpha = 0.1f))
-                .padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(strings.darkTheme, color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Medium)
-                    Text(strings.darkThemeDesc, color = textColor.copy(alpha = 0.7f), fontSize = 12.sp)
-                }
-                Switch(
-                    checked = isDarkTheme,
-                    onCheckedChange = { themeViewModel.toggleTheme() },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = Color(0xFF4CAF50),
-                        uncheckedThumbColor = Color.White,
-                        uncheckedTrackColor = Color.Gray.copy(alpha = 0.5f)
-                    )
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
 
         // Language
         var langExpanded by remember { mutableStateOf(false) }
@@ -94,18 +61,21 @@ fun SettingsScreen(themeViewModel: ThemeViewModel = androidx.lifecycle.viewmodel
             }
             DropdownMenu(
                 expanded = langExpanded,
-                onDismissRequest = { langExpanded = false }
+                onDismissRequest = { langExpanded = false },
+                modifier = Modifier
+                    .background(Color(0xFF2C2C2C).copy(alpha = 0.9f), RoundedCornerShape(16.dp))
+                    .padding(8.dp)
             ) {
                 DropdownMenuItem(
-                    text = { Text("English") },
+                    text = { Text("English", color = Color.White) },
                     onClick = { themeViewModel.setLanguage(AppLanguage.EN); langExpanded = false }
                 )
                 DropdownMenuItem(
-                    text = { Text("中文") },
+                    text = { Text("中文", color = Color.White) },
                     onClick = { themeViewModel.setLanguage(AppLanguage.ZH); langExpanded = false }
                 )
                 DropdownMenuItem(
-                    text = { Text("日本語") },
+                    text = { Text("日本語", color = Color.White) },
                     onClick = { themeViewModel.setLanguage(AppLanguage.JA); langExpanded = false }
                 )
             }

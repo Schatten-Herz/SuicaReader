@@ -46,8 +46,6 @@ fun CardDetailsScreen(
     
     val strings = LocalStrings.current
     val textColor = LocalTextColor.current
-    val isDark by themeViewModel.isDarkTheme.collectAsState()
-    val baseColor = if (isDark) Color(0xFF1E1E1E) else Color(0xFFF5F5F7)
     
     var showManualEntry by remember { mutableStateOf(false) }
     val blurRadius by animateDpAsState(
@@ -56,7 +54,6 @@ fun CardDetailsScreen(
     )
 
     Box(modifier = Modifier.fillMaxSize()) {
-        LiquidBackground(baseColor = baseColor)
 
         Column(modifier = Modifier.fillMaxSize().blur(blurRadius)) {
             Spacer(modifier = Modifier.height(48.dp))
