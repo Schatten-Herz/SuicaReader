@@ -79,14 +79,40 @@ object TransitMapCatalog {
 
     fun coordinateForStation(rawName: String?): LatLng? {
         if (rawName.isNullOrBlank()) return null
-        val plainName = rawName.substringBefore(" (").trim()
-        return stationCoordinates[plainName]
+        val plainName = rawName
+            .substringBefore(" (")
+            .substringBefore("（")
+            .trim()
+        val normalized = when (plainName) {
+            "两国" -> "両国"
+            "浅草桥" -> "浅草橋"
+            "银座" -> "銀座"
+            "东京" -> "東京"
+            "台场海滨公园" -> "お台場海浜公園"
+            else -> plainName
+        }
+        return stationCoordinates[normalized]
     }
 
     fun companyName(rawName: String?): String {
         if (rawName.isNullOrBlank()) return "Unknown"
-        val inParen = rawName.substringAfter("(", "").substringBefore(")")
-        return if (inParen.isBlank()) "Unknown" else inParen
+        val inParen = rawName
+            .substringAfter("(", rawName.substringAfter("（", ""))
+            .substringBefore(")")
+            .substringBefore("）")
+            .trim()
+        if (inParen.isBlank()) return "Unknown"
+        val token = inParen.substringBefore(" ").trim()
+        return when (token) {
+            "JR東日本" -> "東日本旅客鉄道"
+            "JR東海" -> "東海旅客鉄道"
+            "JR西日本" -> "西日本旅客鉄道"
+            "JR北海道" -> "北海道旅客鉄道"
+            "JR四国" -> "四国旅客鉄道"
+            "JR九州" -> "九州旅客鉄道"
+            "都営" -> "東京都交通局"
+            else -> token
+        }
     }
 
     fun colorForCompany(company: String): Color {

@@ -216,7 +216,7 @@ fun TripDetailsScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             GlassCard(
                 modifier = Modifier
@@ -274,7 +274,7 @@ fun TripDetailsScreen(
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             GlassCard(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { showNoteDialog = true }

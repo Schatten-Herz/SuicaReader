@@ -355,10 +355,10 @@ fun CardDetailsScreen(
                             val expandedNicknameSize = expandedBalanceSize / 1.618f // ~29.6sp
                             val collapsedBalanceSize = 28.sp
                             val collapsedNicknameSize = collapsedBalanceSize / 1.618f // ~17.3sp
-                            
+
                             val nicknameSize = lerp(expandedNicknameSize, collapsedNicknameSize, collapseFraction)
                             val balanceSize = lerp(expandedBalanceSize, collapsedBalanceSize, collapseFraction)
-                            
+
                             Column(
                                 modifier = Modifier.fillMaxSize(),
                                 verticalArrangement = Arrangement.SpaceBetween
@@ -373,7 +373,7 @@ fun CardDetailsScreen(
                                         animatedVisibilityScope = animatedVisibilityScope
                                     )
                                 )
-                                
+
                                 Text(
                                     text = "¥${card?.balance ?: 0}",
                                     color = Color.White,

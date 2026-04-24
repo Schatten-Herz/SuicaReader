@@ -13,8 +13,14 @@ interface CardDao {
     @Query("SELECT * FROM transit_cards ORDER BY lastUpdated DESC")
     fun getAllCards(): Flow<List<TransitCard>>
 
+    @Query("SELECT * FROM transit_cards ORDER BY lastUpdated DESC")
+    suspend fun getAllCardsList(): List<TransitCard>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCard(card: TransitCard)
+
+    @Query("SELECT * FROM transit_cards WHERE idm = :idm LIMIT 1")
+    suspend fun getCardByIdm(idm: String): TransitCard?
 
     @androidx.room.Update
     suspend fun updateCard(card: TransitCard)
@@ -27,6 +33,9 @@ interface CardDao {
 
     @Query("SELECT * FROM trip_records WHERE cardIdm = :idm ORDER BY timestamp ASC, id ASC")
     suspend fun getTripsListForCard(idm: String): List<TripRecord>
+
+    @Query("SELECT COUNT(*) FROM trip_records WHERE cardIdm = :idm")
+    suspend fun getTripCountForCard(idm: String): Int
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertTrips(trips: List<TripRecord>)
