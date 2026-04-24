@@ -1,6 +1,7 @@
 package com.example.suicareader.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,7 +11,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Edit
@@ -22,6 +25,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,9 +42,21 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.suicareader.data.db.entity.TripRecord
 import com.example.suicareader.ui.components.glassSurface
+import com.example.suicareader.ui.map.TransitMapCatalog
 import com.example.suicareader.ui.theme.LocalStrings
 import com.example.suicareader.ui.theme.LocalTextColor
 import com.example.suicareader.ui.components.GlassCard
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
+import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.MapProperties
+import com.google.maps.android.compose.MapUiSettings
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.Polyline
+import com.google.maps.android.compose.rememberCameraPositionState
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -59,6 +75,45 @@ fun TripDetailsScreen(
     var editingTitle by remember(trip?.id, showEditDialog) { mutableStateOf(trip?.customTitle ?: "") }
     var editingNote by remember(trip?.id, showEditDialog, showNoteDialog) { mutableStateOf(trip?.note ?: "") }
     val isSubLayerOpen = showEditDialog || showNoteDialog
+    val inStationText = trip?.inStationName ?: trip?.inStation
+    val outStationText = trip?.outStationName ?: trip?.outStation
+    val startLatLng = remember(inStationText) { TransitMapCatalog.coordinateForStation(inStationText) }
+    val endLatLng = remember(outStationText) { TransitMapCatalog.coordinateForStation(outStationText) }
+    val lineCompany = remember(inStationText) { TransitMapCatalog.companyName(inStationText) }
+    val lineColor = remember(lineCompany) { TransitMapCatalog.colorForCompany(lineCompany) }
+    val cameraPositionState = rememberCameraPositionState()
+    val noteLength = trip?.note?.length ?: 0
+    val notePressure = (noteLength / 180f).coerceIn(0f, 1f)
+    val mapWeight by animateFloatAsState(
+        targetValue = (3.6f - notePressure * 1.6f).coerceIn(2.0f, 3.6f),
+        label = "trip_map_weight"
+    )
+    val detailsWeight by animateFloatAsState(
+        targetValue = 1.9f + notePressure * 0.6f,
+        label = "trip_details_weight"
+    )
+    LaunchedEffect(startLatLng, endLatLng) {
+        when {
+            startLatLng != null && endLatLng != null -> {
+                val bounds = LatLngBounds.builder()
+                    .include(startLatLng)
+                    .include(endLatLng)
+                    .build()
+                cameraPositionState.move(CameraUpdateFactory.newLatLngBounds(bounds, 140))
+            }
+            startLatLng != null -> {
+                cameraPositionState.move(CameraUpdateFactory.newLatLngZoom(startLatLng, 13.5f))
+            }
+            endLatLng != null -> {
+                cameraPositionState.move(CameraUpdateFactory.newLatLngZoom(endLatLng, 13.5f))
+            }
+            else -> {
+                cameraPositionState.move(
+                    CameraUpdateFactory.newLatLngZoom(LatLng(35.681236, 139.767125), 11.5f)
+                )
+            }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -84,22 +139,89 @@ fun TripDetailsScreen(
             GlassCard(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(220.dp),
+                    .weight(mapWeight),
                 onClick = {}
             ) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = strings.mapPreviewComingSoon,
-                        color = Color.White.copy(alpha = 0.65f),
-                        fontSize = 16.sp
-                    )
+                Box(modifier = Modifier.fillMaxSize()) {
+                    GoogleMap(
+                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
+                        cameraPositionState = cameraPositionState,
+                        properties = MapProperties(isMyLocationEnabled = false),
+                        uiSettings = MapUiSettings(
+                            compassEnabled = false,
+                            zoomControlsEnabled = false,
+                            mapToolbarEnabled = false
+                        )
+                    ) {
+                        if (startLatLng != null) {
+                            Marker(
+                                state = MarkerState(startLatLng),
+                                title = "Start",
+                                snippet = inStationText,
+                                icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+                            )
+                        }
+                        if (endLatLng != null) {
+                            Marker(
+                                state = MarkerState(endLatLng),
+                                title = "End",
+                                snippet = outStationText,
+                                icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)
+                            )
+                        }
+                        if (startLatLng != null && endLatLng != null) {
+                            Polyline(
+                                points = listOf(startLatLng, endLatLng),
+                                color = lineColor,
+                                width = 12f,
+                                geodesic = true
+                            )
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(10.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color.Black.copy(alpha = 0.35f))
+                            .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .height(4.dp)
+                                    .width(24.dp)
+                                    .background(lineColor, RoundedCornerShape(2.dp))
+                            )
+                            Text(
+                                text = lineCompany,
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+
+                    if (startLatLng == null || endLatLng == null) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(
+                                text = strings.mapPreviewComingSoon,
+                                color = Color.White.copy(alpha = 0.75f),
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             GlassCard(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(detailsWeight),
                 onClick = {}
             ) {
                 if (trip == null) {
@@ -110,7 +232,7 @@ fun TripDetailsScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                 } else {
-                    val dateText = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+                    val dateText = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                         .format(Date(trip.timestamp))
                     val typeText = when (trip.type) {
                         0x01 -> strings.fareSubway
@@ -152,7 +274,7 @@ fun TripDetailsScreen(
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             GlassCard(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { showNoteDialog = true }
@@ -160,7 +282,8 @@ fun TripDetailsScreen(
                 Text(
                     text = trip?.note?.takeIf { it.isNotBlank() } ?: strings.noNote,
                     color = Color.White.copy(alpha = 0.85f),
-                    fontSize = 15.sp
+                    fontSize = 13.sp,
+                    maxLines = if (noteLength > 180) 4 else 2
                 )
             }
         }

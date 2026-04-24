@@ -4,8 +4,10 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
@@ -476,12 +478,20 @@ fun StationPickerDialog(
     onStationSelected: (Pair<String, String>) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
+    var selectedCompany by remember { mutableStateOf<String?>(null) }
     
-    val results = remember(query) { StationResolver.searchStations(query, null) }
-    val groupedResults = remember(results) { 
-        results.groupBy { it.second.substringAfter("(", "").substringBefore(")") } 
+    val companyFilters = remember {
+        listOf(
+            "東日本旅客鉄道",
+            "東京メトロ",
+            "東京都交通局",
+            "京急電鉄",
+            "京成電鉄",
+            "東急電鉄"
+        )
     }
-    
+
+    val results = remember(query, selectedCompany) { StationResolver.searchStations(query, selectedCompany) }
     val strings = com.example.suicareader.ui.theme.LocalStrings.current
     val textColor = com.example.suicareader.ui.theme.LocalTextColor.current
 
@@ -491,29 +501,25 @@ fun StationPickerDialog(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.8f)
-                .clip(RoundedCornerShape(24.dp))
-                .background(Color.White.copy(alpha = 0.15f))
-                .border(
-                    width = 1.dp,
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.5f),
-                            Color.White.copy(alpha = 0.05f)
-                        )
-                    ),
-                    shape = RoundedCornerShape(24.dp)
-                )
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.35f)),
+            contentAlignment = Alignment.Center
         ) {
             Box(
                 modifier = Modifier
-                    .matchParentSize()
-                    .blur(50.dp)
-                    .background(Color.White.copy(alpha = 0.1f))
-            )
-            
-            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                    .fillMaxWidth(0.95f)
+                    .fillMaxHeight(0.8f)
+                    .clip(RoundedCornerShape(24.dp))
+                    .glassSurface(cornerRadius = 24.dp, fillAlpha = 0.18f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .blur(50.dp)
+                        .background(Color.White.copy(alpha = 0.08f))
+                )
+
+                Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
                 Text(strings.searchStation, color = textColor, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
                 
@@ -532,40 +538,69 @@ fun StationPickerDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = selectedCompany == null,
+                        onClick = { selectedCompany = null },
+                        label = { Text("All") }
+                    )
+                    companyFilters.forEach { company ->
+                        FilterChip(
+                            selected = selectedCompany == company,
+                            onClick = {
+                                selectedCompany = if (selectedCompany == company) null else company
+                            },
+                            label = { Text(company, maxLines = 1) }
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
                 
                 LazyColumn(modifier = Modifier.weight(1f)) {
-                    groupedResults.forEach { (company, stations) ->
-                        val groupName = company.takeIf { it.isNotBlank() } ?: "Other"
+                    if (query.isBlank()) {
                         item {
                             Text(
-                                text = groupName,
-                                color = textColor.copy(alpha = 0.6f),
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
+                                text = strings.searchPlaceholder,
+                                color = textColor.copy(alpha = 0.55f),
+                                modifier = Modifier.padding(16.dp)
                             )
-                            Divider(color = textColor.copy(alpha = 0.1f))
                         }
-                        items(stations.size) { i ->
-                            val station = stations[i]
+                    } else {
+                        items(results.size) { i ->
+                            val station = results[i]
+                            val stationName = station.second.substringBefore(" (")
+                            val company = station.second.substringAfter("(", "").substringBefore(")")
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable { onStationSelected(station) }
                                     .padding(vertical = 12.dp)
                             ) {
-                                Text(station.second, color = textColor)
+                                Column {
+                                    Text(stationName, color = textColor, fontWeight = FontWeight.Medium)
+                                    if (company.isNotBlank()) {
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(company, color = textColor.copy(alpha = 0.6f), fontSize = 12.sp)
+                                    }
+                                }
                             }
-                            Divider(color = textColor.copy(alpha = 0.1f))
+                            HorizontalDivider(color = textColor.copy(alpha = 0.1f))
                         }
                     }
-                    if (results.isEmpty()) {
+                    if (query.isNotBlank() && results.isEmpty()) {
                         item {
                             Text(strings.noResults, color = textColor.copy(alpha = 0.5f), modifier = Modifier.padding(16.dp))
                         }
                     }
                 }
+            }
             }
         }
     }
@@ -590,29 +625,25 @@ fun BusCompanyPickerDialog(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth(0.95f)
-                .fillMaxHeight(0.8f)
-                .clip(RoundedCornerShape(24.dp))
-                .background(Color.White.copy(alpha = 0.15f))
-                .border(
-                    width = 1.dp,
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.5f),
-                            Color.White.copy(alpha = 0.05f)
-                        )
-                    ),
-                    shape = RoundedCornerShape(24.dp)
-                )
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.35f)),
+            contentAlignment = Alignment.Center
         ) {
             Box(
                 modifier = Modifier
-                    .matchParentSize()
-                    .blur(50.dp)
-                    .background(Color.White.copy(alpha = 0.1f))
-            )
-            
-            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                    .fillMaxWidth(0.95f)
+                    .fillMaxHeight(0.8f)
+                    .clip(RoundedCornerShape(24.dp))
+                    .glassSurface(cornerRadius = 24.dp, fillAlpha = 0.18f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .blur(50.dp)
+                        .background(Color.White.copy(alpha = 0.08f))
+                )
+
+                Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
                 Text("Select Bus Company", color = textColor, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
                 
@@ -652,6 +683,7 @@ fun BusCompanyPickerDialog(
                         }
                     }
                 }
+            }
             }
         }
     }

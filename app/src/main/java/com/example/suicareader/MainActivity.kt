@@ -18,6 +18,7 @@ import androidx.activity.viewModels
 import com.example.suicareader.data.db.AppDatabase
 import com.example.suicareader.ui.MainViewModel
 import com.example.suicareader.ui.MainViewModelFactory
+import com.example.suicareader.ui.map.TransitMapCatalog
 
 class MainActivity : ComponentActivity() {
 
@@ -32,6 +33,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         
         com.example.suicareader.nfc.StationResolver.init(this)
+        TransitMapCatalog.init(this)
         
         nfcReaderManager = NfcReaderManager(
             activity = this,

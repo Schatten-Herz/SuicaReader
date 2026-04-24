@@ -47,14 +47,34 @@ object StationResolver {
 
     fun searchStations(query: String, companyFilter: String? = null): List<Pair<String, String>> {
         val map = stations ?: return emptyList()
+        val q = query.trim()
+        if (q.isBlank()) return emptyList()
+
         return map.entries
-            .filter { (_, name) -> 
-                val matchesQuery = query.isBlank() || name.contains(query, ignoreCase = true)
+            .asSequence()
+            .filter { (_, name) ->
+                // Filter out testing data from station master.
+                !name.contains("試験")
+            }
+            .filter { (_, name) ->
+                val matchesQuery = name.contains(q, ignoreCase = true)
                 val matchesCompany = companyFilter == null || name.contains(companyFilter, ignoreCase = true)
                 matchesQuery && matchesCompany
             }
             .map { it.key to it.value }
-            .take(50) // Limit results for performance
+            .distinctBy { it.second } // remove duplicate entries from short/full codes
+            .sortedWith(compareBy<Pair<String, String>> {
+                val stationOnly = it.second.substringBefore(" (")
+                when {
+                    stationOnly.equals(q, ignoreCase = true) -> 0
+                    stationOnly.startsWith(q, ignoreCase = true) -> 1
+                    it.second.contains("京急川崎") && q.contains("川崎") -> 1
+                    stationOnly.contains(q, ignoreCase = true) -> 2
+                    else -> 3
+                }
+            }.thenBy { it.second.length })
+            .take(300)
+            .toList()
     }
 
     fun getAllCompanies(): List<String> {
