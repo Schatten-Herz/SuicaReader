@@ -56,7 +56,9 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
                         outStationName = parsed.outStationName,
                         amount = amount,
                         balance = parsed.balance,
-                        blockHex = parsed.blockHex
+                        blockHex = parsed.blockHex,
+                        customTitle = null,
+                        note = null
                     )
                 )
             }
@@ -93,7 +95,9 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
         inStationName: String,
         outStationCode: String?,
         outStationName: String?,
-        timestamp: Long // User selected date's timestamp
+        timestamp: Long, // User selected date's timestamp
+        customTitle: String? = null,
+        note: String? = null
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             val currentCards = cards.value
@@ -114,7 +118,9 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
                 outStationName = outStationName,
                 amount = amount,
                 balance = 0, // Will be recalculated
-                blockHex = blockHex
+                blockHex = blockHex,
+                customTitle = customTitle?.takeIf { it.isNotBlank() },
+                note = note?.takeIf { it.isNotBlank() }
             )
             
             cardDao.insertTrips(listOf(newTrip))
@@ -163,6 +169,19 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
     }
 
     fun getTripsForCard(idm: String) = cardDao.getTripsForCard(idm)
+
+    fun getTripById(tripId: Long) = cardDao.getTripById(tripId)
+
+    fun updateTripDetails(trip: com.example.suicareader.data.db.entity.TripRecord, newTitle: String, newNote: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            cardDao.updateTrip(
+                trip.copy(
+                    customTitle = newTitle.takeIf { it.isNotBlank() },
+                    note = newNote.takeIf { it.isNotBlank() }
+                )
+            )
+        }
+    }
 }
 
 class MainViewModelFactory(private val cardDao: CardDao) : ViewModelProvider.Factory {

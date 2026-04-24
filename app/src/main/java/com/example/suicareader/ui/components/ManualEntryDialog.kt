@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.suicareader.nfc.StationResolver
+import com.example.suicareader.ui.components.glassSurface
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -31,10 +32,22 @@ import java.util.Locale
 @Composable
 fun ManualEntryDialog(
     onDismiss: () -> Unit,
-    onSubmit: (type: Int, amount: Int, inStationCode: String, inStationName: String, outStationCode: String?, outStationName: String?, timestamp: Long) -> Unit
+    onSubmit: (
+        type: Int,
+        amount: Int,
+        inStationCode: String,
+        inStationName: String,
+        outStationCode: String?,
+        outStationName: String?,
+        timestamp: Long,
+        customTitle: String?,
+        note: String?
+    ) -> Unit
 ) {
-    var selectedType by remember { mutableStateOf(EntryType.Train) } // Train, Bus, Recharge
+    var selectedType by remember { mutableStateOf(EntryType.Train) }
     var amountStr by remember { mutableStateOf("") }
+    var customTitle by remember { mutableStateOf("") }
+    var note by remember { mutableStateOf("") }
     
     var inStation by remember { mutableStateOf<Pair<String, String>?>(null) }
     var outStation by remember { mutableStateOf<Pair<String, String>?>(null) }
@@ -42,9 +55,12 @@ fun ManualEntryDialog(
     
     var timestamp by remember { mutableStateOf(System.currentTimeMillis()) }
     var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+    var showTypePicker by remember { mutableStateOf(false) }
 
     var pickingFor by remember { mutableStateOf<String?>(null) } // "IN" or "OUT"
     var showBusPicker by remember { mutableStateOf(false) }
+    val isSubLayerOpen = pickingFor != null || showBusPicker || showTypePicker || showDatePicker || showTimePicker
 
     val strings = com.example.suicareader.ui.theme.LocalStrings.current
     val textColor = com.example.suicareader.ui.theme.LocalTextColor.current
@@ -57,7 +73,6 @@ fun ManualEntryDialog(
                 pickingFor = null
             }
         )
-        return
     }
 
     if (showBusPicker) {
@@ -68,7 +83,50 @@ fun ManualEntryDialog(
                 showBusPicker = false
             }
         )
-        return
+    }
+
+    if (showTypePicker) {
+        Dialog(
+            onDismissRequest = { showTypePicker = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.85f)
+                    .clip(RoundedCornerShape(20.dp))
+                    .glassSurface(cornerRadius = 20.dp, fillAlpha = 0.22f)
+                    .padding(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(strings.chooseType, color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    listOf(EntryType.Train, EntryType.Bus, EntryType.Recharge, EntryType.Locker, EntryType.Expense).forEach { type ->
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    selectedType = type
+                                    showTypePicker = false
+                                },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (selectedType == type) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.08f)
+                        ) {
+                            Text(
+                                text = when (type) {
+                                    EntryType.Train -> strings.typeTrain
+                                    EntryType.Bus -> strings.typeBus
+                                    EntryType.Recharge -> strings.typeRecharge
+                                    EntryType.Locker -> strings.typeLocker
+                                    EntryType.Expense -> strings.typeExpense
+                                },
+                                color = textColor,
+                                fontWeight = if (selectedType == type) FontWeight.Bold else FontWeight.Normal,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 
     if (showDatePicker) {
@@ -91,6 +149,35 @@ fun ManualEntryDialog(
         ) {
             DatePicker(state = datePickerState)
         }
+    }
+
+    if (showTimePicker) {
+        val currentCal = remember(timestamp) {
+            java.util.Calendar.getInstance().apply { timeInMillis = timestamp }
+        }
+        val timePickerState = rememberTimePickerState(
+            initialHour = currentCal.get(java.util.Calendar.HOUR_OF_DAY),
+            initialMinute = currentCal.get(java.util.Calendar.MINUTE),
+            is24Hour = true
+        )
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    val calendar = java.util.Calendar.getInstance().apply {
+                        timeInMillis = timestamp
+                        set(java.util.Calendar.HOUR_OF_DAY, timePickerState.hour)
+                        set(java.util.Calendar.MINUTE, timePickerState.minute)
+                    }
+                    timestamp = calendar.timeInMillis
+                    showTimePicker = false
+                }) { Text(strings.save) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) { Text(strings.cancel) }
+            },
+            text = { TimePicker(state = timePickerState) }
+        )
     }
 
     Dialog(
@@ -123,14 +210,24 @@ fun ManualEntryDialog(
             )
             
             Column(modifier = Modifier.padding(24.dp)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .blur(if (isSubLayerOpen) 14.dp else 0.dp)
+                ) {
+                    Column {
                 Text(strings.addManualEntry, color = textColor, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Date Picker Button (More distinct)
+                // Date & Time
                 val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
                 Surface(
-                    modifier = Modifier.fillMaxWidth().clickable { showDatePicker = true },
-                    color = Color.White.copy(alpha = 0.1f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .glassSurface(cornerRadius = 12.dp, fillAlpha = 0.14f, borderAlphaStrong = 0.35f, borderAlphaWeak = 0.08f)
+                        .clickable { showDatePicker = true },
+                    color = Color.Transparent,
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Row(
@@ -138,40 +235,57 @@ fun ManualEntryDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Date", color = textColor.copy(alpha = 0.7f))
+                        Text(strings.dateLabel, color = textColor.copy(alpha = 0.7f))
                         Text(dateFormat.format(Date(timestamp)), color = textColor, fontWeight = FontWeight.Bold)
                     }
                 }
-                
-                Spacer(modifier = Modifier.height(20.dp))
-                
-                // Type Toggle (Segmented control style)
-                Row(
+                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                        .padding(4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .glassSurface(cornerRadius = 12.dp, fillAlpha = 0.14f, borderAlphaStrong = 0.35f, borderAlphaWeak = 0.08f)
+                        .clickable { showTimePicker = true },
+                    color = Color.Transparent,
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    listOf(EntryType.Train, EntryType.Bus, EntryType.Recharge).forEach { type ->
-                        val isSelected = selectedType == type
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (isSelected) Color.White.copy(alpha = 0.2f) else Color.Transparent)
-                                .clickable { selectedType = type }
-                                .padding(vertical = 10.dp),
-                            contentAlignment = Alignment.Center
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(strings.timeLabel, color = textColor.copy(alpha = 0.7f))
+                        Text(timeFormat.format(Date(timestamp)), color = textColor, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+                
+                // Type selector (menu style, easier to scale with more types)
+                Box {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .glassSurface(cornerRadius = 12.dp, fillAlpha = 0.14f, borderAlphaStrong = 0.35f, borderAlphaWeak = 0.08f)
+                            .clickable { showTypePicker = true },
+                        color = Color.Transparent,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Text(strings.typeLabel, color = textColor.copy(alpha = 0.7f))
                             Text(
-                                text = when(type) {
-                                    EntryType.Train -> "Train"
-                                    EntryType.Bus -> "Bus"
-                                    EntryType.Recharge -> "Recharge"
+                                text = when (selectedType) {
+                                    EntryType.Train -> strings.typeTrain
+                                    EntryType.Bus -> strings.typeBus
+                                    EntryType.Recharge -> strings.typeRecharge
+                                    EntryType.Locker -> strings.typeLocker
+                                    EntryType.Expense -> strings.typeExpense
                                 },
-                                color = if (isSelected) textColor else textColor.copy(alpha = 0.6f),
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                color = textColor,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
@@ -252,9 +366,43 @@ fun ManualEntryDialog(
                             }
                         }
                     }
+                    EntryType.Locker, EntryType.Expense -> {
+                        OutlinedTextField(
+                            value = customTitle,
+                            onValueChange = { customTitle = it },
+                            label = { Text(strings.tripNameLabel, color = textColor.copy(alpha = 0.7f)) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = textColor,
+                                unfocusedTextColor = textColor,
+                                focusedBorderColor = textColor,
+                                unfocusedBorderColor = textColor.copy(alpha = 0.3f),
+                                unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
+                                focusedContainerColor = Color.White.copy(alpha = 0.08f)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
-                
-                Spacer(modifier = Modifier.height(32.dp))
+
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it },
+                    label = { Text(strings.noteLabel, color = textColor.copy(alpha = 0.7f)) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = textColor,
+                        unfocusedTextColor = textColor,
+                        focusedBorderColor = textColor,
+                        unfocusedBorderColor = textColor.copy(alpha = 0.3f),
+                        unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
+                        focusedContainerColor = Color.White.copy(alpha = 0.08f)
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
                 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -273,16 +421,22 @@ fun ManualEntryDialog(
                             when (selectedType) {
                                 EntryType.Train -> {
                                     if (inStation != null && outStation != null) {
-                                        onSubmit(0x01, -amt, inStation!!.first, inStation!!.second, outStation!!.first, outStation!!.second, timestamp)
+                                        onSubmit(0x01, -amt, inStation!!.first, inStation!!.second, outStation!!.first, outStation!!.second, timestamp, customTitle, note)
                                     }
                                 }
                                 EntryType.Bus -> {
-                                    onSubmit(0x0F, -amt, "BUS-00-00", busCompany, null, null, timestamp)
+                                    onSubmit(0x0F, -amt, "BUS-00-00", busCompany, null, null, timestamp, customTitle, note)
                                 }
                                 EntryType.Recharge -> {
                                     if (inStation != null) {
-                                        onSubmit(0x02, amt, inStation!!.first, inStation!!.second, null, null, timestamp)
+                                        onSubmit(0x02, amt, inStation!!.first, inStation!!.second, null, null, timestamp, customTitle, note)
                                     }
+                                }
+                                EntryType.Locker -> {
+                                    onSubmit(0x50, -amt, "LOCKER", "Locker", null, null, timestamp, customTitle.ifBlank { "Locker" }, note)
+                                }
+                                EntryType.Expense -> {
+                                    onSubmit(0x46, -amt, "EXPENSE", "Expense", null, null, timestamp, customTitle.ifBlank { "Expense" }, note)
                                 }
                             }
                         },
@@ -290,6 +444,7 @@ fun ManualEntryDialog(
                             EntryType.Train -> inStation != null && outStation != null
                             EntryType.Bus -> busCompany.isNotBlank()
                             EntryType.Recharge -> inStation != null
+                            EntryType.Locker, EntryType.Expense -> true
                         },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF4CAF50), // Using a distinct accent color for primary action
@@ -303,13 +458,15 @@ fun ManualEntryDialog(
                         Text(strings.save, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                 }
+                    }
+                }
             }
         }
     }
 }
 
 enum class EntryType {
-    Train, Bus, Recharge
+    Train, Bus, Recharge, Locker, Expense
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -22,5 +22,7 @@ data class TripRecord(
     val outStationName: String?, // 解析后的真实出站名称
     val amount: Int, // 交易金额 (可能为正或负)
     val balance: Int, // 交易后余额
-    val blockHex: String // 16字节原始数据指纹防重
+    val blockHex: String, // 16字节原始数据指纹防重
+    val customTitle: String? = null, // 用户自定义行程名称
+    val note: String? = null // 行程备注
 )

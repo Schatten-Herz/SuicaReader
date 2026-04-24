@@ -6,6 +6,9 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,12 +23,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.lerp
+import android.os.Build
+import android.graphics.Shader
 import com.example.suicareader.data.db.entity.TripRecord
 import com.example.suicareader.ui.MainViewModel
 import com.example.suicareader.ui.components.GlassCard
@@ -35,6 +44,8 @@ import sh.calvin.reorderable.*
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -44,7 +55,8 @@ fun CardDetailsScreen(
     themeViewModel: com.example.suicareader.ui.theme.ThemeViewModel,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onTripClick: (TripRecord) -> Unit
 ) {
     val cards by viewModel.cards.collectAsState()
     val card = cards.find { it.idm == cardIdm }
@@ -61,6 +73,8 @@ fun CardDetailsScreen(
     val dbTrips by viewModel.getTripsForCard(cardIdm).collectAsState(initial = emptyList())
     
     var currentTrips by remember { mutableStateOf<List<TripRecord>>(emptyList()) }
+    var pendingClickTripId by remember { mutableStateOf<Long?>(null) }
+    val scope = rememberCoroutineScope()
     
     LaunchedEffect(dbTrips) {
         currentTrips = dbTrips
@@ -115,24 +129,28 @@ fun CardDetailsScreen(
         val maxWidthDp = maxWidth
         val maxCardHeightDp = (maxWidthDp - 32.dp) / 1.586f // ISO/IEC 7810 ID-1 ratio
         val minCardHeightDp = 120.dp // Increased to prevent clipping of balance text
+        val maxScrollPx = with(density) { (maxCardHeightDp - minCardHeightDp).toPx() }
         
         // Calculate collapse fraction (0f = expanded, 1f = collapsed)
         // Use derived state to avoid unnecessary recompositions if only scroll changes
-        val scrollOffsetPx by remember {
+        val scrollOffsetPx by remember(maxScrollPx) {
             derivedStateOf {
                 if (lazyListState.firstVisibleItemIndex == 0) {
                     lazyListState.firstVisibleItemScrollOffset.toFloat()
                 } else {
-                    Float.MAX_VALUE
+                    maxScrollPx
                 }
             }
         }
-        
-        val maxScrollPx = with(density) { (maxCardHeightDp - minCardHeightDp).toPx() }
+
         val rawFraction = if (maxScrollPx > 0) scrollOffsetPx / maxScrollPx else 0f
         val collapseFraction = rawFraction.coerceIn(0f, 1f)
         
-        val currentCardHeightDp = lerp(maxCardHeightDp, minCardHeightDp, collapseFraction)
+        val targetCardHeightDp = lerp(maxCardHeightDp, minCardHeightDp, collapseFraction)
+        val currentCardHeightDp by animateDpAsState(
+            targetValue = targetCardHeightDp,
+            label = "card_height"
+        )
         
         Box(modifier = Modifier.fillMaxSize().blur(blurRadius)) {
             
@@ -178,6 +196,7 @@ fun CardDetailsScreen(
                                     0x02 -> strings.chargeTopUp
                                     0x0F, 0x0D -> strings.busFare
                                     0x46 -> strings.purchase
+                                    0x50 -> "Locker"
                                     else -> "Transaction (0x${"%02X".format(item.type)})"
                                 }
                                 
@@ -191,18 +210,33 @@ fun CardDetailsScreen(
                                     0x02 -> "${strings.locationPrefix} $inDisplay"
                                     0x0F, 0x0D -> "${strings.busRoutePrefix} $inDisplay"
                                     0x46 -> "${strings.terminalPrefix} $inDisplay"
+                                    0x50 -> item.note?.takeIf { it.isNotBlank() } ?: "Locker usage"
                                     else -> "${strings.inPrefix} $inDisplay\n${strings.outPrefix} $outDisplay"
                                 }
 
-                                val scale by animateFloatAsState(
-                                    targetValue = if (isDragging) 0.95f else 1f,
-                                    label = "drag_scale"
+                                val interactionSource = remember { MutableInteractionSource() }
+                                val isPressed by interactionSource.collectIsPressedAsState()
+                                val pressScale by animateFloatAsState(
+                                    targetValue = if (isPressed || isDragging || pendingClickTripId == item.id) 0.95f else 1f,
+                                    label = "trip_press_scale"
                                 )
 
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .scale(scale)
+                                        .scale(pressScale)
+                                        .clickable(
+                                            interactionSource = interactionSource,
+                                            indication = null
+                                        ) {
+                                            if (pendingClickTripId != null) return@clickable
+                                            pendingClickTripId = item.id
+                                            scope.launch {
+                                                delay(110)
+                                                onTripClick(item)
+                                                pendingClickTripId = null
+                                            }
+                                        }
                                         .longPressDraggableHandle(
                                             onDragStarted = { },
                                             onDragStopped = { 
@@ -224,7 +258,7 @@ fun CardDetailsScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text(transactionName, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                                            Text(item.customTitle ?: transactionName, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                                             Spacer(modifier = Modifier.height(4.dp))
                                             Text(detailText, color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp, maxLines = 2)
                                         }
@@ -248,6 +282,30 @@ fun CardDetailsScreen(
                     .fillMaxWidth()
                     .height(110.dp + maxCardHeightDp + 48.dp) // Cover the expanded header area
             ) {
+                // Soften the transition from top overlay to clear list area.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp)
+                        .graphicsLayer {
+                            compositingStrategy = CompositingStrategy.Offscreen
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                renderEffect = android.graphics.RenderEffect
+                                    .createBlurEffect(48f, 48f, Shader.TileMode.CLAMP)
+                                    .asComposeRenderEffect()
+                            }
+                        }
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.22f),
+                                    Color.White.copy(alpha = 0.12f),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                )
+
                 // Background for the header to blend smoothly with list
                 if (collapseFraction > 0f) {
                     Box(
@@ -269,7 +327,15 @@ fun CardDetailsScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Spacer(modifier = Modifier.height(48.dp))
-                    IconButton(onClick = onBackClick) {
+                    IconButton(onClick = {
+                        scope.launch {
+                            if (lazyListState.firstVisibleItemIndex > 0 || lazyListState.firstVisibleItemScrollOffset > 0) {
+                                lazyListState.animateScrollToItem(0, 0)
+                                delay(120)
+                            }
+                            onBackClick()
+                        }
+                    }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = textColor)
                     }
 
@@ -301,7 +367,11 @@ fun CardDetailsScreen(
                                     text = card?.nickname ?: "Unknown Card",
                                     color = Color.White,
                                     fontSize = nicknameSize,
-                                    fontWeight = FontWeight.SemiBold
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.sharedBounds(
+                                        rememberSharedContentState(key = "nickname_${cardIdm}"),
+                                        animatedVisibilityScope = animatedVisibilityScope
+                                    )
                                 )
                                 
                                 Text(
@@ -322,16 +392,19 @@ fun CardDetailsScreen(
                     val textAlpha = (1f - (collapseFraction * 2f)).coerceIn(0f, 1f)
                     val textHeight = lerp(40.dp, 0.dp, collapseFraction)
                     
-                    if (textAlpha > 0f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .padding(top = 16.dp, bottom = 8.dp)
+                            .height(textHeight),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
                         Text(
                             text = strings.tripHistory,
                             color = textColor.copy(alpha = textAlpha),
                             fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier
-                                .padding(horizontal = 16.dp)
-                                .padding(top = 16.dp, bottom = 8.dp)
-                                .height(textHeight)
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
@@ -341,8 +414,8 @@ fun CardDetailsScreen(
         if (showManualEntry) {
             com.example.suicareader.ui.components.ManualEntryDialog(
                 onDismiss = { showManualEntry = false },
-                onSubmit = { type, amount, inStationCode, inStationName, outStationCode, outStationName, timestamp ->
-                    viewModel.addManualTrip(cardIdm, type, amount, inStationCode, inStationName, outStationCode, outStationName, timestamp)
+                onSubmit = { type, amount, inStationCode, inStationName, outStationCode, outStationName, timestamp, customTitle, note ->
+                    viewModel.addManualTrip(cardIdm, type, amount, inStationCode, inStationName, outStationCode, outStationName, timestamp, customTitle, note)
                     showManualEntry = false
                 }
             )

@@ -43,7 +43,22 @@ data class AppStrings(
     val cardNumberLabel: String,
     val cardNumberPlaceholder: String,
     val tripHistory: String,
-    val balanceLabel: String
+    val balanceLabel: String,
+    val dateLabel: String,
+    val timeLabel: String,
+    val typeLabel: String,
+    val tripNameLabel: String,
+    val noteLabel: String,
+    val mapPreviewComingSoon: String,
+    val tripNotFound: String,
+    val noNote: String,
+    val editTrip: String,
+    val chooseType: String,
+    val typeTrain: String,
+    val typeBus: String,
+    val typeRecharge: String,
+    val typeLocker: String,
+    val typeExpense: String
 )
 
 val EnStrings = AppStrings(
@@ -85,7 +100,22 @@ val EnStrings = AppStrings(
     cardNumberLabel = "Card Number (Last 4 digits)",
     cardNumberPlaceholder = "Optional",
     tripHistory = "Trip History",
-    balanceLabel = "Balance"
+    balanceLabel = "Balance",
+    dateLabel = "Date",
+    timeLabel = "Time",
+    typeLabel = "Type",
+    tripNameLabel = "Trip Name",
+    noteLabel = "Note",
+    mapPreviewComingSoon = "Map Preview (Coming Soon)",
+    tripNotFound = "Trip not found",
+    noNote = "No note",
+    editTrip = "Edit Trip",
+    chooseType = "Choose Type",
+    typeTrain = "Train",
+    typeBus = "Bus",
+    typeRecharge = "Recharge",
+    typeLocker = "Locker",
+    typeExpense = "Expense"
 )
 
 val ZhStrings = AppStrings(
@@ -127,7 +157,22 @@ val ZhStrings = AppStrings(
     cardNumberLabel = "卡号尾数 (后四位)",
     cardNumberPlaceholder = "选填",
     tripHistory = "行程记录",
-    balanceLabel = "余额"
+    balanceLabel = "余额",
+    dateLabel = "日期",
+    timeLabel = "时间",
+    typeLabel = "类型",
+    tripNameLabel = "行程名称",
+    noteLabel = "备注",
+    mapPreviewComingSoon = "地图预览（即将上线）",
+    tripNotFound = "未找到行程",
+    noNote = "暂无备注",
+    editTrip = "编辑行程",
+    chooseType = "选择类型",
+    typeTrain = "轨道交通",
+    typeBus = "公交",
+    typeRecharge = "充值",
+    typeLocker = "储物柜",
+    typeExpense = "消费"
 )
 
 val JaStrings = AppStrings(
@@ -169,7 +214,22 @@ val JaStrings = AppStrings(
     cardNumberLabel = "カード番号 (下4桁)",
     cardNumberPlaceholder = "任意",
     tripHistory = "利用履歴",
-    balanceLabel = "残高"
+    balanceLabel = "残高",
+    dateLabel = "日付",
+    timeLabel = "時刻",
+    typeLabel = "種別",
+    tripNameLabel = "履歴名",
+    noteLabel = "メモ",
+    mapPreviewComingSoon = "マップ表示（準備中）",
+    tripNotFound = "履歴が見つかりません",
+    noNote = "メモなし",
+    editTrip = "履歴を編集",
+    chooseType = "種別を選択",
+    typeTrain = "鉄道",
+    typeBus = "バス",
+    typeRecharge = "チャージ",
+    typeLocker = "ロッカー",
+    typeExpense = "支出"
 )
 
 val LocalStrings = staticCompositionLocalOf { EnStrings }

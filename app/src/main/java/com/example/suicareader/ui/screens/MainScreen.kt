@@ -6,6 +6,8 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -16,9 +18,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,6 +40,8 @@ import com.example.suicareader.ui.theme.ThemeViewModel
 
 import com.example.suicareader.ui.theme.LocalStrings
 import com.example.suicareader.ui.theme.LocalTextColor
+import com.example.suicareader.ui.theme.Motion
+import com.example.suicareader.ui.components.glassSurface
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -100,10 +106,7 @@ fun GlassBottomBar(
     val selectedIndex = if (currentRoute == "dashboard") 0 else 1
     val indicatorOffset by androidx.compose.animation.core.animateDpAsState(
         targetValue = (selectedIndex * (100 + 8)).dp,
-        animationSpec = androidx.compose.animation.core.spring(
-            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy,
-            stiffness = androidx.compose.animation.core.Spring.StiffnessLow
-        ),
+        animationSpec = Motion.BottomBarSpring,
         label = "indicator"
     )
 
@@ -116,20 +119,7 @@ fun GlassBottomBar(
         Box(
             modifier = Modifier
                 .height(64.dp) // Fixed height for consistency
-                .clip(RoundedCornerShape(50))
-                .background(Color.White.copy(alpha = 0.1f))
-                .border(
-                    width = 1.dp,
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.3f),
-                            Color.White.copy(alpha = 0.05f)
-                        ),
-                        start = Offset(0f, 0f),
-                        end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
-                    ),
-                    shape = RoundedCornerShape(50)
-                )
+                .glassSurface(cornerRadius = 50.dp, fillAlpha = 0.12f, borderAlphaStrong = 0.35f, borderAlphaWeak = 0.06f)
                 .padding(6.dp) // Padding for the indicator to breathe
         ) {
             // Animated Indicator Pill
@@ -176,6 +166,13 @@ fun BottomNavItem(
     onClick: () -> Unit
 ) {
     val contentColor = if (selected) textColor else textColor.copy(alpha = 0.6f)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isPressed) Motion.PressedScale else 1f,
+        animationSpec = Motion.PressSpring,
+        label = "bottom_item_scale"
+    )
     
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -183,8 +180,13 @@ fun BottomNavItem(
         modifier = Modifier
             .width(100.dp)
             .fillMaxHeight()
+            .scale(scale)
             .clip(RoundedCornerShape(50))
-            .clickable { onClick() }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
     ) {
         // 微调视觉重心，增加 2dp 顶部间距
         Spacer(modifier = Modifier.height(2.dp))

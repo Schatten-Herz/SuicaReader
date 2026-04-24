@@ -8,7 +8,7 @@ import com.example.suicareader.data.db.dao.CardDao
 import com.example.suicareader.data.db.entity.TransitCard
 import com.example.suicareader.data.db.entity.TripRecord
 
-@Database(entities = [TransitCard::class, TripRecord::class], version = 6, exportSchema = false)
+@Database(entities = [TransitCard::class, TripRecord::class], version = 7, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun cardDao(): CardDao
 

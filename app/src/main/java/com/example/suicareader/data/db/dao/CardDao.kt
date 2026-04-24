@@ -22,6 +22,9 @@ interface CardDao {
     @Query("SELECT * FROM trip_records WHERE cardIdm = :idm ORDER BY timestamp DESC, id DESC")
     fun getTripsForCard(idm: String): Flow<List<TripRecord>>
 
+    @Query("SELECT * FROM trip_records WHERE id = :tripId LIMIT 1")
+    fun getTripById(tripId: Long): Flow<TripRecord?>
+
     @Query("SELECT * FROM trip_records WHERE cardIdm = :idm ORDER BY timestamp ASC, id ASC")
     suspend fun getTripsListForCard(idm: String): List<TripRecord>
 
@@ -30,6 +33,9 @@ interface CardDao {
 
     @androidx.room.Update
     suspend fun updateTrips(trips: List<TripRecord>)
+
+    @androidx.room.Update
+    suspend fun updateTrip(trip: TripRecord)
 
     @Query("DELETE FROM transit_cards WHERE idm = :idm")
     suspend fun deleteCard(idm: String)

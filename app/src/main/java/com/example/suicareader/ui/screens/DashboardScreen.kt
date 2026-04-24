@@ -98,7 +98,11 @@ fun DashboardScreen(
                                         text = card.nickname,
                                         color = Color.White,
                                         fontSize = nicknameSize,
-                                        fontWeight = FontWeight.SemiBold
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.sharedBounds(
+                                            rememberSharedContentState(key = "nickname_${card.idm}"),
+                                            animatedVisibilityScope = animatedVisibilityScope
+                                        )
                                     )
                                     if (!card.displayNumber.isNullOrBlank()) {
                                         Spacer(modifier = Modifier.height(4.dp))
