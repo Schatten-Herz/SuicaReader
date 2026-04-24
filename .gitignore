@@ -1,20 +1,50 @@
-# 编译产物
-/build
-/.gradle
+# --- 构建产物 ---
+.gradle/
+**/.gradle/
+.gradle/**/checksums/*.bin
+.gradle/**/executionHistory/*.bin
+.gradle/**/executionHistory/*.lock
+.gradle/**/fileHashes/*.bin
+.gradle/**/fileHashes/*.lock
+.gradle/**/buildOutputCleanup/*.bin
+.gradle/**/buildOutputCleanup/*.lock
+.gradle/file-system.probe
+build/
+**/build/
+*.apk
+*.bundle
+app/release/
+*.dm
+.cxx/
+externalNativeBuild/
 
-# IDE 配置文件
-/.idea
+# --- IDE 配置文件 ---
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/gradle.xml
+.idea/assetWizardSettings.xml
+.idea/navEditor.xml
+.idea/shelf/
+.idea/vcs.xml
+.idea/caches/
+# 个人路径和状态，保留项目结构配置
 *.iml
 *.iws
 
-# 本地环境变量
-local.properties
+# --- 测试与性能分析 ---
+/captures
+*.hprof
+/lint/reports/
+/lint/intermediate-res/
 
-# 签名文件
+# --- 本地环境与密钥 ---
+local.properties
 *.jks
 *.keystore
 *.p12
+*.pub
+google-services.json (视情况而定，开源项目必忽略)
 
-# 临时文件
+# --- 系统临时文件 ---
 .DS_Store
-/captures
+Thumbs.db
