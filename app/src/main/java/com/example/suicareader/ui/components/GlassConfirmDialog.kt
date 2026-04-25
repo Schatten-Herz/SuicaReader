@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.suicareader.ui.theme.LocalStrings
 
 @Composable
 fun GlassConfirmDialog(
@@ -26,6 +27,7 @@ fun GlassConfirmDialog(
     onDismissRequest: () -> Unit,
     onConfirmClick: () -> Unit
 ) {
+    val strings = LocalStrings.current
     Dialog(
         onDismissRequest = onDismissRequest,
         properties = DialogProperties(
@@ -77,7 +79,7 @@ fun GlassConfirmDialog(
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = onDismissRequest) {
-                        Text("Cancel", color = Color.White.copy(alpha = 0.7f))
+                        Text(strings.cancel, color = Color.White.copy(alpha = 0.7f))
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Button(

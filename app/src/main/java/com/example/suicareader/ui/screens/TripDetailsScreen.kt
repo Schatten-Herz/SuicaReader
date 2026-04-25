@@ -186,7 +186,7 @@ fun TripDetailsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBackClick) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = textColor)
+                    Icon(Icons.Default.ArrowBack, contentDescription = strings.back, tint = textColor)
                 }
                 IconButton(onClick = { showActionMenu = true }) {
                     Icon(Icons.Default.Edit, contentDescription = strings.editTrip, tint = textColor)
@@ -214,7 +214,7 @@ fun TripDetailsScreen(
                             if (startLatLng != null) {
                                 Marker(
                                     state = startMarkerState!!,
-                                    title = "Start",
+                                    title = strings.start,
                                     snippet = inStationText,
                                     icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
                                 )
@@ -222,7 +222,7 @@ fun TripDetailsScreen(
                             if (endLatLng != null) {
                                 Marker(
                                     state = endMarkerState!!,
-                                    title = "End",
+                                    title = strings.end,
                                     snippet = outStationText,
                                     icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)
                                 )
@@ -306,7 +306,7 @@ fun TripDetailsScreen(
                         0x0F, 0x0D -> strings.busFare
                         0x46 -> strings.purchase
                         0x50 -> strings.typeLocker
-                        else -> "Transaction (0x${"%02X".format(trip.type)})"
+                        else -> "${strings.transactionLabel} (0x${"%02X".format(trip.type)})"
                     }
                     val inDisplay = trip.inStationName ?: trip.inStation
                     val outDisplay = trip.outStationName ?: trip.outStation
@@ -322,7 +322,7 @@ fun TripDetailsScreen(
                         Text(text = "${strings.inPrefix} $inDisplay", color = Color.White.copy(alpha = 0.85f), fontSize = 16.sp)
                         Text(text = "${strings.outPrefix} $outDisplay", color = Color.White.copy(alpha = 0.85f), fontSize = 16.sp)
                         Text(
-                            text = "Amount: ${if (trip.amount > 0) "+" else ""}¥${trip.amount}",
+                            text = "${strings.amountLabel}: ${if (trip.amount > 0) "+" else ""}¥${trip.amount}",
                             color = if (trip.amount > 0) Color(0xFF4CAF50) else Color(0xFFE53935),
                             fontSize = 20.sp,
                             fontWeight = FontWeight.SemiBold
@@ -333,7 +333,7 @@ fun TripDetailsScreen(
                             fontSize = 18.sp
                         )
                         Text(
-                            text = "Raw Block: ${trip.blockHex}",
+                            text = "${strings.rawBlockLabel}: ${trip.blockHex}",
                             color = Color.White.copy(alpha = 0.5f),
                             fontSize = 12.sp
                         )
@@ -367,17 +367,17 @@ fun TripDetailsScreen(
                 showActionMenu = false
                 showDeleteConfirm = true
             },
-            title = "Trip Options",
-            editText = "Edit Trip",
-            deleteText = "Delete Trip"
+            title = strings.tripOptionsTitle,
+            editText = strings.editTripOption,
+            deleteText = strings.deleteTripOption
         )
     }
 
     if (showDeleteConfirm && trip != null) {
         com.example.suicareader.ui.components.GlassConfirmDialog(
-            title = "Delete Trip?",
-            message = "This will permanently delete this trip record. This action cannot be undone.",
-            confirmText = "Delete",
+            title = strings.deleteTripTitle,
+            message = strings.deleteTripMessage,
+            confirmText = strings.deleteCard,
             confirmColor = Color(0xFFFF5252),
             onDismissRequest = { showDeleteConfirm = false },
             onConfirmClick = {

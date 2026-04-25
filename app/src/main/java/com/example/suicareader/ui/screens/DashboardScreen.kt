@@ -164,7 +164,10 @@ fun DashboardScreen(
                         onDeleteClick = {
                             cardToDelete.value = cardToEdit.value!!.idm
                             cardToEdit.value = null
-                        }
+                    },
+                    title = strings.cardOptionsTitle,
+                    editText = strings.editCard,
+                    deleteText = strings.deleteCard
                     )
                 } else {
                     com.example.suicareader.ui.components.RenameCardDialog(
@@ -181,9 +184,9 @@ fun DashboardScreen(
 
             if (cardToDelete.value != null) {
                 com.example.suicareader.ui.components.GlassConfirmDialog(
-                    title = "Delete Card?",
-                    message = "This will permanently delete the card and all its trip history. This action cannot be undone.",
-                    confirmText = "Delete",
+                    title = strings.deleteCardTitle,
+                    message = strings.deleteCardMessage,
+                    confirmText = strings.deleteCard,
                     confirmColor = Color(0xFFFF5252),
                     onDismissRequest = { cardToDelete.value = null },
                     onConfirmClick = {

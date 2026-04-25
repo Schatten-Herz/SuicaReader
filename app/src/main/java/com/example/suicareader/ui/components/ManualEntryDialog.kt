@@ -276,7 +276,7 @@ fun ManualEntryDialog(
                             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
                         ) {
                             Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("In: ", color = textColor.copy(alpha = 0.5f))
+                                Text(strings.inShortLabel, color = textColor.copy(alpha = 0.5f))
                                 Text(inStation?.second ?: strings.selectInStation, color = if (inStation == null) textColor.copy(alpha = 0.5f) else textColor)
                             }
                         }
@@ -288,7 +288,7 @@ fun ManualEntryDialog(
                             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
                         ) {
                             Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("Out: ", color = textColor.copy(alpha = 0.5f))
+                                Text(strings.outShortLabel, color = textColor.copy(alpha = 0.5f))
                                 Text(outStation?.second ?: strings.selectOutStation, color = if (outStation == null) textColor.copy(alpha = 0.5f) else textColor)
                             }
                         }
@@ -301,8 +301,8 @@ fun ManualEntryDialog(
                             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
                         ) {
                             Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("Bus: ", color = textColor.copy(alpha = 0.5f))
-                                Text(if (busCompany.isNotBlank()) busCompany else "Select Bus Company", color = if (busCompany.isBlank()) textColor.copy(alpha = 0.5f) else textColor)
+                                Text(strings.busShortLabel, color = textColor.copy(alpha = 0.5f))
+                                Text(if (busCompany.isNotBlank()) busCompany else strings.selectBusCompany, color = if (busCompany.isBlank()) textColor.copy(alpha = 0.5f) else textColor)
                             }
                         }
                     }
@@ -314,8 +314,8 @@ fun ManualEntryDialog(
                             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
                         ) {
                             Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("Location: ", color = textColor.copy(alpha = 0.5f))
-                                Text(inStation?.second ?: "Select Recharge Station", color = if (inStation == null) textColor.copy(alpha = 0.5f) else textColor)
+                                Text(strings.locationShortLabel, color = textColor.copy(alpha = 0.5f))
+                                Text(inStation?.second ?: strings.selectRechargeStation, color = if (inStation == null) textColor.copy(alpha = 0.5f) else textColor)
                             }
                         }
                     }
@@ -499,7 +499,7 @@ fun StationPickerDialog(
                     FilterChip(
                         selected = selectedCompany == null,
                         onClick = { selectedCompany = null },
-                        label = { Text("All") }
+                        label = { Text(strings.allLabel) }
                     )
                     companyFilters.forEach { company ->
                         FilterChip(
@@ -595,7 +595,7 @@ fun BusCompanyPickerDialog(
                 )
 
                 Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                Text("Select Bus Company", color = textColor, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(strings.selectBusCompanyTitle, color = textColor, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 OutlinedTextField(

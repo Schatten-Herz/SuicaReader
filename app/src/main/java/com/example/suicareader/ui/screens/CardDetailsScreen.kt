@@ -203,8 +203,8 @@ fun CardDetailsScreen(
                                         0x02 -> strings.chargeTopUp
                                         0x0F, 0x0D -> strings.busFare
                                         0x46 -> strings.purchase
-                                        0x50 -> "Locker"
-                                        else -> "Transaction (0x${"%02X".format(item.type)})"
+                                        0x50 -> strings.typeLocker
+                                        else -> "${strings.transactionLabel} (0x${"%02X".format(item.type)})"
                                     }
                                     
                                     val amountColor = if (item.amount > 0) Color(0xFF4CAF50) else Color(0xFFE53935)
@@ -217,7 +217,7 @@ fun CardDetailsScreen(
                                         0x02 -> "${strings.locationPrefix} $inDisplay"
                                         0x0F, 0x0D -> "${strings.busRoutePrefix} $inDisplay"
                                         0x46 -> "${strings.terminalPrefix} $inDisplay"
-                                        0x50 -> item.note?.takeIf { it.isNotBlank() } ?: "Locker usage"
+                                        0x50 -> item.note?.takeIf { it.isNotBlank() } ?: strings.lockerUsage
                                         else -> "${strings.inPrefix} $inDisplay\n${strings.outPrefix} $outDisplay"
                                     }
 
@@ -284,8 +284,8 @@ fun CardDetailsScreen(
                                     0x02 -> strings.chargeTopUp
                                     0x0F, 0x0D -> strings.busFare
                                     0x46 -> strings.purchase
-                                    0x50 -> "Locker"
-                                    else -> "Transaction (0x${"%02X".format(item.type)})"
+                                    0x50 -> strings.typeLocker
+                                    else -> "${strings.transactionLabel} (0x${"%02X".format(item.type)})"
                                 }
                                 
                                 val amountColor = if (item.amount > 0) Color(0xFF4CAF50) else Color(0xFFE53935)
@@ -298,7 +298,7 @@ fun CardDetailsScreen(
                                     0x02 -> "${strings.locationPrefix} $inDisplay"
                                     0x0F, 0x0D -> "${strings.busRoutePrefix} $inDisplay"
                                     0x46 -> "${strings.terminalPrefix} $inDisplay"
-                                    0x50 -> item.note?.takeIf { it.isNotBlank() } ?: "Locker usage"
+                                    0x50 -> item.note?.takeIf { it.isNotBlank() } ?: strings.lockerUsage
                                     else -> "${strings.inPrefix} $inDisplay\n${strings.outPrefix} $outDisplay"
                                 }
 
@@ -406,7 +406,7 @@ fun CardDetailsScreen(
                             onBackClick()
                         }
                     }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = textColor)
+                        Icon(Icons.Default.ArrowBack, contentDescription = strings.back, tint = textColor)
                     }
 
                     with(sharedTransitionScope) {
@@ -434,7 +434,7 @@ fun CardDetailsScreen(
                                 verticalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
-                                    text = card?.nickname ?: "Unknown Card",
+                                    text = card?.nickname ?: strings.unknownCard,
                                     color = Color.White,
                                     fontSize = nicknameSize,
                                     fontWeight = FontWeight.SemiBold,

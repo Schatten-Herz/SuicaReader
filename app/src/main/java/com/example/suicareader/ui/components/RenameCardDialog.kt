@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.suicareader.ui.theme.LocalStrings
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,6 +30,7 @@ fun RenameCardDialog(
 ) {
     var name by remember { mutableStateOf(initialName) }
     var number by remember { mutableStateOf(initialNumber) }
+    val strings = LocalStrings.current
 
     Dialog(
         onDismissRequest = onDismissRequest,
@@ -61,7 +63,7 @@ fun RenameCardDialog(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = "Edit Card",
+                    text = strings.editCard,
                     color = Color.White,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
@@ -71,7 +73,7 @@ fun RenameCardDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Card Name", color = Color.White.copy(alpha = 0.7f)) },
+                    label = { Text(strings.cardNameLabel, color = Color.White.copy(alpha = 0.7f)) },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White,
@@ -87,7 +89,7 @@ fun RenameCardDialog(
                 OutlinedTextField(
                     value = number,
                     onValueChange = { if (it.length <= 4) number = it },
-                    label = { Text("Last 4 Digits (Optional)", color = Color.White.copy(alpha = 0.7f)) },
+                    label = { Text(strings.cardNumberLabel, color = Color.White.copy(alpha = 0.7f)) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
@@ -106,14 +108,14 @@ fun RenameCardDialog(
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = onDismissRequest) {
-                        Text("Cancel", color = Color.White.copy(alpha = 0.7f))
+                        Text(strings.cancel, color = Color.White.copy(alpha = 0.7f))
                     }
                     Spacer(modifier = Modifier.width(16.dp))
                     Button(
                         onClick = { onSaveClick(name, number) },
                         colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f))
                     ) {
-                        Text("Save", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(strings.save, color = Color.White, fontWeight = FontWeight.Bold)
                     }
                 }
             }
