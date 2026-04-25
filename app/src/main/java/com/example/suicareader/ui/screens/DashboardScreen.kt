@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.suicareader.data.db.entity.TransitCard
@@ -89,46 +90,59 @@ fun DashboardScreen(
                                 onClick = { onCardClick(card.idm) },
                                 onLongClick = { cardToEdit.value = card } // Changed to show menu
                             ) {
-                                Column(modifier = Modifier.fillMaxSize()) {
-                                    // Golden ratio hierarchy: larger nickname and phi-based spacing.
-                                    val balanceSize = 38.sp
-                                    val nicknameSize = balanceSize / 1.1f //
+                                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                                    // Keep consistent look across different resolutions.
+                                    val nicknameSize = (maxWidth.value * 0.092f).coerceIn(19f, 27f).sp
+                                    val balanceSize = (maxWidth.value * 0.128f).coerceIn(30f, 42f).sp
+                                    val numberSize = (maxWidth.value * 0.042f).coerceIn(12f, 15f).sp
+                                    val topPadding = (maxHeight * 0.08f).coerceIn(8.dp, 18.dp)
+                                    val nameBottomGap = (maxHeight * 0.03f).coerceIn(4.dp, 10.dp)
+                                    val showNumber = !card.displayNumber.isNullOrBlank() && maxHeight > 140.dp
 
-                                    Spacer(modifier = Modifier.weight(0.1f))
+                                    Column(modifier = Modifier.fillMaxSize()) {
+                                        Spacer(modifier = Modifier.height(topPadding))
 
-                                    Text(
-                                        text = card.nickname,
-                                        color = Color.White,
-                                        fontSize = nicknameSize,
-                                        fontWeight = FontWeight.SemiBold,
-                                        modifier = Modifier.sharedBounds(
-                                            rememberSharedContentState(key = "nickname_${card.idm}"),
-                                            animatedVisibilityScope = animatedVisibilityScope
-                                        )
-                                    )
-                                    if (!card.displayNumber.isNullOrBlank()) {
-                                        Spacer(modifier = Modifier.height(6.dp))
                                         Text(
-                                            text = "•••• •••• •••• ${card.displayNumber}",
-                                            color = Color.White.copy(alpha = 0.7f),
-                                            fontSize = 14.sp,
-                                            letterSpacing = 2.sp
-                                        )
-                                    }
-                                    
-                                    Spacer(modifier = Modifier.weight(1f))
-                                    
-                                    with(sharedTransitionScope) {
-                                        Text(
-                                            text = "¥${card.balance}",
+                                            text = card.nickname,
                                             color = Color.White,
-                                            fontSize = balanceSize,
-                                            fontWeight = FontWeight.Bold,
+                                            fontSize = nicknameSize,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                            lineHeight = nicknameSize * 1.08f,
                                             modifier = Modifier.sharedBounds(
-                                                rememberSharedContentState(key = "balance_${card.idm}"),
+                                                rememberSharedContentState(key = "nickname_${card.idm}"),
                                                 animatedVisibilityScope = animatedVisibilityScope
                                             )
                                         )
+                                        Spacer(modifier = Modifier.height(nameBottomGap))
+
+                                        if (showNumber) {
+                                            Text(
+                                                text = "•••• •••• •••• ${card.displayNumber}",
+                                                color = Color.White.copy(alpha = 0.68f),
+                                                fontSize = numberSize,
+                                                letterSpacing = 2.sp,
+                                                maxLines = 1
+                                            )
+                                        }
+
+                                        Spacer(modifier = Modifier.weight(1f))
+
+                                        with(sharedTransitionScope) {
+                                            Text(
+                                                text = "¥${card.balance}",
+                                                color = Color.White,
+                                                fontSize = balanceSize,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.sharedBounds(
+                                                    rememberSharedContentState(key = "balance_${card.idm}"),
+                                                    animatedVisibilityScope = animatedVisibilityScope
+                                                )
+                                            )
+                                        }
                                     }
                                 }
                             }
