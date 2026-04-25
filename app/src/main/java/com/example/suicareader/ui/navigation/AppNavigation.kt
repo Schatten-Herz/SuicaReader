@@ -156,6 +156,9 @@ fun AppNavigation(viewModel: MainViewModel, themeViewModel: ThemeViewModel = vie
                             onSaveEdit = { source, title, note ->
                                 viewModel.updateTripDetails(source, title, note)
                             },
+                            onDeleteTrip = { source ->
+                                viewModel.deleteTrip(source)
+                            },
                             onBackClick = { navController.popBackStack() }
                         )
                     }

@@ -9,6 +9,7 @@ object TransitMapCatalog {
     @Volatile
     private var initialized = false
     private var stationCoordinates: Map<String, LatLng> = emptyMap()
+    private var stationCompanyOverrides: Map<String, LatLng> = emptyMap()
 
     private val companyColors = mapOf(
         // JR
@@ -52,6 +53,7 @@ object TransitMapCatalog {
         synchronized(this) {
             if (initialized) return
             stationCoordinates = loadCoordinatesFromAssets(context)
+            stationCompanyOverrides = loadCoordinateOverridesFromAssets(context)
             initialized = true
         }
     }
@@ -77,12 +79,37 @@ object TransitMapCatalog {
         }
     }
 
+    private fun loadCoordinateOverridesFromAssets(context: Context): Map<String, LatLng> {
+        return try {
+            val jsonStr = context.assets
+                .open("station_coordinates_overrides.json")
+                .bufferedReader(Charsets.UTF_8)
+                .use { it.readText() }
+            val json = JSONObject(jsonStr)
+            val map = mutableMapOf<String, LatLng>()
+            val keys = json.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val coord = json.optJSONObject(key) ?: continue
+                val lat = coord.optDouble("lat", Double.NaN)
+                val lng = coord.optDouble("lng", Double.NaN)
+                if (!lat.isNaN() && !lng.isNaN()) {
+                    map[key] = LatLng(lat, lng)
+                }
+            }
+            map
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
+
     fun coordinateForStation(rawName: String?): LatLng? {
         if (rawName.isNullOrBlank()) return null
         val plainName = rawName
             .substringBefore(" (")
             .substringBefore("（")
             .trim()
+        val company = parseCompany(rawName)
         val normalized = when (plainName) {
             "两国" -> "両国"
             "浅草桥" -> "浅草橋"
@@ -91,10 +118,17 @@ object TransitMapCatalog {
             "台场海滨公园" -> "お台場海浜公園"
             else -> plainName
         }
+        stationCompanyOverrides["$normalized|$company"]?.let { return it }
         return stationCoordinates[normalized]
     }
 
     fun companyName(rawName: String?): String {
+        if (rawName.isNullOrBlank()) return "Unknown"
+        val token = parseCompany(rawName)
+        return if (token == "Unknown") "Unknown" else token
+    }
+
+    private fun parseCompany(rawName: String?): String {
         if (rawName.isNullOrBlank()) return "Unknown"
         val inParen = rawName
             .substringAfter("(", rawName.substringAfter("（", ""))
@@ -110,6 +144,7 @@ object TransitMapCatalog {
             "JR北海道" -> "北海道旅客鉄道"
             "JR四国" -> "四国旅客鉄道"
             "JR九州" -> "九州旅客鉄道"
+            "東京メトロ" -> "東京地下鉄"
             "都営" -> "東京都交通局"
             else -> token
         }

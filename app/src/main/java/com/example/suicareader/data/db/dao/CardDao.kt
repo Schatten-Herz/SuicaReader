@@ -46,6 +46,9 @@ interface CardDao {
     @androidx.room.Update
     suspend fun updateTrip(trip: TripRecord)
 
+    @Query("DELETE FROM trip_records WHERE id = :tripId")
+    suspend fun deleteTripById(tripId: Long)
+
     @Query("DELETE FROM transit_cards WHERE idm = :idm")
     suspend fun deleteCard(idm: String)
 

@@ -95,33 +95,37 @@ fun CardDetailsScreen(
         list
     }
 
-    val reorderableState = rememberReorderableLazyColumnState(lazyListState) { from, to ->
-        val fromItem = from.key as? String ?: return@rememberReorderableLazyColumnState
-        val toItem = to.key as? String ?: return@rememberReorderableLazyColumnState
-        
-        // Key format is "trip_${id}" or "header_${date}"
-        if (fromItem.startsWith("trip_") && toItem.startsWith("trip_")) {
-            val fromId = fromItem.removePrefix("trip_").toLongOrNull()
-            val toId = toItem.removePrefix("trip_").toLongOrNull()
+    val reorderableState = if (enableReorder) {
+        rememberReorderableLazyColumnState(lazyListState) { from, to ->
+            val fromItem = from.key as? String ?: return@rememberReorderableLazyColumnState
+            val toItem = to.key as? String ?: return@rememberReorderableLazyColumnState
             
-            if (fromId != null && toId != null) {
-                val fromTrip = currentTrips.find { it.id == fromId }
-                val toTrip = currentTrips.find { it.id == toId }
+            // Key format is "trip_${id}" or "header_${date}"
+            if (fromItem.startsWith("trip_") && toItem.startsWith("trip_")) {
+                val fromId = fromItem.removePrefix("trip_").toLongOrNull()
+                val toId = toItem.removePrefix("trip_").toLongOrNull()
                 
-                if (fromTrip != null && toTrip != null) {
-                    val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                    if (dateFormat.format(Date(fromTrip.timestamp)) == dateFormat.format(Date(toTrip.timestamp))) {
-                        val fromIndex = currentTrips.indexOfFirst { it.id == fromId }
-                        val toIndex = currentTrips.indexOfFirst { it.id == toId }
-                        if (fromIndex != -1 && toIndex != -1) {
-                            currentTrips = currentTrips.toMutableList().apply {
-                                add(toIndex, removeAt(fromIndex))
+                if (fromId != null && toId != null) {
+                    val fromTrip = currentTrips.find { it.id == fromId }
+                    val toTrip = currentTrips.find { it.id == toId }
+                    
+                    if (fromTrip != null && toTrip != null) {
+                        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                        if (dateFormat.format(Date(fromTrip.timestamp)) == dateFormat.format(Date(toTrip.timestamp))) {
+                            val fromIndex = currentTrips.indexOfFirst { it.id == fromId }
+                            val toIndex = currentTrips.indexOfFirst { it.id == toId }
+                            if (fromIndex != -1 && toIndex != -1) {
+                                currentTrips = currentTrips.toMutableList().apply {
+                                    add(toIndex, removeAt(fromIndex))
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    } else {
+        null
     }
 
     val density = LocalDensity.current
@@ -192,7 +196,7 @@ fun CardDetailsScreen(
                             }
                         }
                         is TripRecord -> {
-                            if (enableReorder) {
+                            if (enableReorder && reorderableState != null) {
                                 ReorderableItem(reorderableState, key = "trip_${item.id}") { isDragging ->
                                     val transactionName = when (item.type) {
                                         0x01 -> strings.fareSubway

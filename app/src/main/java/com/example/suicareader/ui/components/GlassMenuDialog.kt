@@ -29,7 +29,10 @@ import androidx.compose.ui.window.DialogProperties
 fun GlassMenuDialog(
     onDismissRequest: () -> Unit,
     onEditClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    title: String = "Card Options",
+    editText: String = "Edit Card",
+    deleteText: String = "Delete Card"
 ) {
     Dialog(
         onDismissRequest = onDismissRequest,
@@ -64,7 +67,7 @@ fun GlassMenuDialog(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = "Card Options",
+                    text = title,
                     color = Color.White,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
@@ -74,7 +77,7 @@ fun GlassMenuDialog(
                 // 菜单项：编辑
                 GlassMenuItem(
                     icon = Icons.Default.Edit,
-                    text = "Edit Card",
+                    text = editText,
                     textColor = Color.White.copy(alpha = 0.9f),
                     iconColor = Color.White.copy(alpha = 0.9f),
                     onClick = {
@@ -87,7 +90,7 @@ fun GlassMenuDialog(
                 // 菜单项：删除
                 GlassMenuItem(
                     icon = Icons.Default.Delete,
-                    text = "Delete Card",
+                    text = deleteText,
                     textColor = Color(0xFFFF5252), // 红色警示
                     iconColor = Color(0xFFFF5252),
                     onClick = {

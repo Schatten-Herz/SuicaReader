@@ -89,10 +89,12 @@ fun DashboardScreen(
                                 onClick = { onCardClick(card.idm) },
                                 onLongClick = { cardToEdit.value = card } // Changed to show menu
                             ) {
-                                Column {
-                                    // Golden ratio applied
-                                    val balanceSize = 32.sp
-                                    val nicknameSize = balanceSize / 1.618f // ~19.8sp
+                                Column(modifier = Modifier.fillMaxSize()) {
+                                    // Golden ratio hierarchy: larger nickname and phi-based spacing.
+                                    val balanceSize = 38.sp
+                                    val nicknameSize = balanceSize / 1.1f //
+
+                                    Spacer(modifier = Modifier.weight(0.1f))
 
                                     Text(
                                         text = card.nickname,
@@ -105,7 +107,7 @@ fun DashboardScreen(
                                         )
                                     )
                                     if (!card.displayNumber.isNullOrBlank()) {
-                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Spacer(modifier = Modifier.height(6.dp))
                                         Text(
                                             text = "•••• •••• •••• ${card.displayNumber}",
                                             color = Color.White.copy(alpha = 0.7f),
@@ -114,9 +116,7 @@ fun DashboardScreen(
                                         )
                                     }
                                     
-                                    // Golden ratio spacing: top spacing is ~0.618, bottom spacing is 1.0 (Wait, they are pushed apart)
-                                    // To place the content at golden ratio points, we distribute the blank space
-                                    Spacer(modifier = Modifier.weight(1.618f))
+                                    Spacer(modifier = Modifier.weight(1f))
                                     
                                     with(sharedTransitionScope) {
                                         Text(

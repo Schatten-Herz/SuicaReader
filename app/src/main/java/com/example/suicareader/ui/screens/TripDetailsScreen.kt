@@ -1,5 +1,7 @@
 package com.example.suicareader.ui.screens
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -34,7 +36,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -61,29 +66,44 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.delay
+import androidx.compose.animation.core.spring
 
 @Composable
 fun TripDetailsScreen(
     trip: TripRecord?,
     onSaveEdit: (TripRecord, String, String) -> Unit,
+    onDeleteTrip: (TripRecord) -> Unit,
     onBackClick: () -> Unit
 ) {
     val strings = LocalStrings.current
     val textColor = LocalTextColor.current
 
+    var showActionMenu by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     var showNoteDialog by remember { mutableStateOf(false) }
     var editingTitle by remember(trip?.id, showEditDialog) { mutableStateOf(trip?.customTitle ?: "") }
     var editingNote by remember(trip?.id, showEditDialog, showNoteDialog) { mutableStateOf(trip?.note ?: "") }
-    val isSubLayerOpen = showEditDialog || showNoteDialog
+    val isSubLayerOpen = showActionMenu || showEditDialog || showDeleteConfirm || showNoteDialog
     val inStationText = trip?.inStationName ?: trip?.inStation
     val outStationText = trip?.outStationName ?: trip?.outStation
     val startLatLng = remember(inStationText) { TransitMapCatalog.coordinateForStation(inStationText) }
     val endLatLng = remember(outStationText) { TransitMapCatalog.coordinateForStation(outStationText) }
+    val startMarkerState = remember(startLatLng) { startLatLng?.let { MarkerState(it) } }
+    val endMarkerState = remember(endLatLng) { endLatLng?.let { MarkerState(it) } }
     val lineCompany = remember(inStationText) { TransitMapCatalog.companyName(inStationText) }
     val lineColor = remember(lineCompany) { TransitMapCatalog.colorForCompany(lineCompany) }
     val cameraPositionState = rememberCameraPositionState()
     var showMapContent by remember(trip?.id) { mutableStateOf(false) }
+    var stretchOffset by remember { mutableStateOf(0f) }
+    val animatedStretch by animateFloatAsState(
+        targetValue = stretchOffset,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "trip_limit_stretch"
+    )
     val noteLength = trip?.note?.length ?: 0
     val notePressure = (noteLength / 180f).coerceIn(0f, 1f)
     val mapWeight by animateFloatAsState(
@@ -96,7 +116,7 @@ fun TripDetailsScreen(
     )
     LaunchedEffect(trip?.id) {
         showMapContent = false
-        delay(220)
+        delay(380)
         showMapContent = true
     }
 
@@ -124,12 +144,40 @@ fun TripDetailsScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onVerticalDrag = { _, dragAmount ->
+                        val next = (stretchOffset + dragAmount * 0.35f).coerceIn(-90f, 90f)
+                        stretchOffset = next
+                    },
+                    onDragEnd = {
+                        stretchOffset = 0f
+                    },
+                    onDragCancel = {
+                        stretchOffset = 0f
+                    }
+                )
+            }
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .blur(if (isSubLayerOpen) 14.dp else 0.dp)
                 .padding(horizontal = 16.dp)
+                .graphicsLayer {
+                    val offsetAbs = kotlin.math.abs(animatedStretch)
+                    val stretchScale = 1f + (offsetAbs / 900f)
+                    scaleY = stretchScale
+                    translationY = animatedStretch * 0.25f
+                    transformOrigin = if (animatedStretch >= 0f) {
+                        TransformOrigin(0.5f, 0f)
+                    } else {
+                        TransformOrigin(0.5f, 1f)
+                    }
+                }
         ) {
             Spacer(modifier = Modifier.height(48.dp))
             Row(
@@ -140,7 +188,7 @@ fun TripDetailsScreen(
                 IconButton(onClick = onBackClick) {
                     Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = textColor)
                 }
-                IconButton(onClick = { showEditDialog = true }) {
+                IconButton(onClick = { showActionMenu = true }) {
                     Icon(Icons.Default.Edit, contentDescription = strings.editTrip, tint = textColor)
                 }
             }
@@ -165,7 +213,7 @@ fun TripDetailsScreen(
                         ) {
                             if (startLatLng != null) {
                                 Marker(
-                                    state = MarkerState(startLatLng),
+                                    state = startMarkerState!!,
                                     title = "Start",
                                     snippet = inStationText,
                                     icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
@@ -173,7 +221,7 @@ fun TripDetailsScreen(
                             }
                             if (endLatLng != null) {
                                 Marker(
-                                    state = MarkerState(endLatLng),
+                                    state = endMarkerState!!,
                                     title = "End",
                                     snippet = outStationText,
                                     icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)
@@ -305,6 +353,39 @@ fun TripDetailsScreen(
                 )
             }
         }
+
+    }
+
+    if (showActionMenu) {
+        com.example.suicareader.ui.components.GlassMenuDialog(
+            onDismissRequest = { showActionMenu = false },
+            onEditClick = {
+                showActionMenu = false
+                showEditDialog = true
+            },
+            onDeleteClick = {
+                showActionMenu = false
+                showDeleteConfirm = true
+            },
+            title = "Trip Options",
+            editText = "Edit Trip",
+            deleteText = "Delete Trip"
+        )
+    }
+
+    if (showDeleteConfirm && trip != null) {
+        com.example.suicareader.ui.components.GlassConfirmDialog(
+            title = "Delete Trip?",
+            message = "This will permanently delete this trip record. This action cannot be undone.",
+            confirmText = "Delete",
+            confirmColor = Color(0xFFFF5252),
+            onDismissRequest = { showDeleteConfirm = false },
+            onConfirmClick = {
+                onDeleteTrip(trip)
+                showDeleteConfirm = false
+                onBackClick()
+            }
+        )
     }
 
     if (showEditDialog && trip != null) {

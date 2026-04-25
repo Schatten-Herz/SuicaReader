@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.random.Random
 
@@ -31,6 +32,8 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
 
     private fun refreshLegacyStationNames() {
         viewModelScope.launch(Dispatchers.IO) {
+            // Delay heavy DB scan to keep cold-start transitions smooth.
+            delay(3500)
             val allCards = cardDao.getAllCardsList()
             allCards.forEach { card ->
                 val trips = cardDao.getTripsListForCard(card.idm)
@@ -75,18 +78,22 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
 
     private fun ensureTestCardSeeded() {
         viewModelScope.launch(Dispatchers.IO) {
+            // Seed data is non-critical, defer it after app launch.
+            delay(2000)
             val testIdm = "TESTTOKYO2400"
             val existing = cardDao.getCardByIdm(testIdm)
             if (existing == null) {
                 cardDao.insertCard(
                     TransitCard(
                         idm = testIdm,
-                        nickname = "Suica Card",
+                        nickname = "Suica Card [Test]",
                         balance = 2400,
                         themeColor = 0xFF4CAF50,
                         lastUpdated = System.currentTimeMillis()
                     )
                 )
+            } else if (!existing.nickname.contains("test", ignoreCase = true)) {
+                cardDao.updateCard(existing.copy(nickname = "Suica Card [Test]"))
             }
 
             val existingTrips = cardDao.getTripsListForCard(testIdm)
@@ -342,6 +349,13 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
                     note = newNote.takeIf { it.isNotBlank() }
                 )
             )
+        }
+    }
+
+    fun deleteTrip(trip: com.example.suicareader.data.db.entity.TripRecord) {
+        viewModelScope.launch(Dispatchers.IO) {
+            cardDao.deleteTripById(trip.id)
+            recalculateBalances(trip.cardIdm)
         }
     }
 }

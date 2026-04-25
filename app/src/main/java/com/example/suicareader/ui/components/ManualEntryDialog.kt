@@ -57,12 +57,11 @@ fun ManualEntryDialog(
     
     var timestamp by remember { mutableStateOf(System.currentTimeMillis()) }
     var showDatePicker by remember { mutableStateOf(false) }
-    var showTimePicker by remember { mutableStateOf(false) }
     var showTypePicker by remember { mutableStateOf(false) }
 
     var pickingFor by remember { mutableStateOf<String?>(null) } // "IN" or "OUT"
     var showBusPicker by remember { mutableStateOf(false) }
-    val isSubLayerOpen = pickingFor != null || showBusPicker || showTypePicker || showDatePicker || showTimePicker
+    val isSubLayerOpen = pickingFor != null || showBusPicker || showTypePicker || showDatePicker
 
     val strings = com.example.suicareader.ui.theme.LocalStrings.current
     val textColor = com.example.suicareader.ui.theme.LocalTextColor.current
@@ -153,35 +152,6 @@ fun ManualEntryDialog(
         }
     }
 
-    if (showTimePicker) {
-        val currentCal = remember(timestamp) {
-            java.util.Calendar.getInstance().apply { timeInMillis = timestamp }
-        }
-        val timePickerState = rememberTimePickerState(
-            initialHour = currentCal.get(java.util.Calendar.HOUR_OF_DAY),
-            initialMinute = currentCal.get(java.util.Calendar.MINUTE),
-            is24Hour = true
-        )
-        AlertDialog(
-            onDismissRequest = { showTimePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    val calendar = java.util.Calendar.getInstance().apply {
-                        timeInMillis = timestamp
-                        set(java.util.Calendar.HOUR_OF_DAY, timePickerState.hour)
-                        set(java.util.Calendar.MINUTE, timePickerState.minute)
-                    }
-                    timestamp = calendar.timeInMillis
-                    showTimePicker = false
-                }) { Text(strings.save) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showTimePicker = false }) { Text(strings.cancel) }
-            },
-            text = { TimePicker(state = timePickerState) }
-        )
-    }
-
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -221,9 +191,8 @@ fun ManualEntryDialog(
                 Text(strings.addManualEntry, color = textColor, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Date & Time
+                // Date only
                 val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -239,24 +208,6 @@ fun ManualEntryDialog(
                     ) {
                         Text(strings.dateLabel, color = textColor.copy(alpha = 0.7f))
                         Text(dateFormat.format(Date(timestamp)), color = textColor, fontWeight = FontWeight.Bold)
-                    }
-                }
-                Spacer(modifier = Modifier.height(10.dp))
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .glassSurface(cornerRadius = 12.dp, fillAlpha = 0.14f, borderAlphaStrong = 0.35f, borderAlphaWeak = 0.08f)
-                        .clickable { showTimePicker = true },
-                    color = Color.Transparent,
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(strings.timeLabel, color = textColor.copy(alpha = 0.7f))
-                        Text(timeFormat.format(Date(timestamp)), color = textColor, fontWeight = FontWeight.Bold)
                     }
                 }
 
