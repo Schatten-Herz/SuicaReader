@@ -60,6 +60,7 @@ import com.google.maps.android.compose.rememberCameraPositionState
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.delay
 
 @Composable
 fun TripDetailsScreen(
@@ -82,6 +83,7 @@ fun TripDetailsScreen(
     val lineCompany = remember(inStationText) { TransitMapCatalog.companyName(inStationText) }
     val lineColor = remember(lineCompany) { TransitMapCatalog.colorForCompany(lineCompany) }
     val cameraPositionState = rememberCameraPositionState()
+    var showMapContent by remember(trip?.id) { mutableStateOf(false) }
     val noteLength = trip?.note?.length ?: 0
     val notePressure = (noteLength / 180f).coerceIn(0f, 1f)
     val mapWeight by animateFloatAsState(
@@ -92,7 +94,14 @@ fun TripDetailsScreen(
         targetValue = 1.9f + notePressure * 0.6f,
         label = "trip_details_weight"
     )
-    LaunchedEffect(startLatLng, endLatLng) {
+    LaunchedEffect(trip?.id) {
+        showMapContent = false
+        delay(220)
+        showMapContent = true
+    }
+
+    LaunchedEffect(startLatLng, endLatLng, showMapContent) {
+        if (!showMapContent) return@LaunchedEffect
         when {
             startLatLng != null && endLatLng != null -> {
                 val bounds = LatLngBounds.builder()
@@ -143,40 +152,49 @@ fun TripDetailsScreen(
                 onClick = {}
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    GoogleMap(
-                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
-                        cameraPositionState = cameraPositionState,
-                        properties = MapProperties(isMyLocationEnabled = false),
-                        uiSettings = MapUiSettings(
-                            compassEnabled = false,
-                            zoomControlsEnabled = false,
-                            mapToolbarEnabled = false
+                    if (showMapContent) {
+                        GoogleMap(
+                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
+                            cameraPositionState = cameraPositionState,
+                            properties = MapProperties(isMyLocationEnabled = false),
+                            uiSettings = MapUiSettings(
+                                compassEnabled = false,
+                                zoomControlsEnabled = false,
+                                mapToolbarEnabled = false
+                            )
+                        ) {
+                            if (startLatLng != null) {
+                                Marker(
+                                    state = MarkerState(startLatLng),
+                                    title = "Start",
+                                    snippet = inStationText,
+                                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+                                )
+                            }
+                            if (endLatLng != null) {
+                                Marker(
+                                    state = MarkerState(endLatLng),
+                                    title = "End",
+                                    snippet = outStationText,
+                                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)
+                                )
+                            }
+                            if (startLatLng != null && endLatLng != null) {
+                                Polyline(
+                                    points = listOf(startLatLng, endLatLng),
+                                    color = lineColor,
+                                    width = 12f,
+                                    geodesic = true
+                                )
+                            }
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color(0x1FFFFFFF))
                         )
-                    ) {
-                        if (startLatLng != null) {
-                            Marker(
-                                state = MarkerState(startLatLng),
-                                title = "Start",
-                                snippet = inStationText,
-                                icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
-                            )
-                        }
-                        if (endLatLng != null) {
-                            Marker(
-                                state = MarkerState(endLatLng),
-                                title = "End",
-                                snippet = outStationText,
-                                icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)
-                            )
-                        }
-                        if (startLatLng != null && endLatLng != null) {
-                            Polyline(
-                                points = listOf(startLatLng, endLatLng),
-                                color = lineColor,
-                                width = 12f,
-                                geodesic = true
-                            )
-                        }
                     }
 
                     Box(

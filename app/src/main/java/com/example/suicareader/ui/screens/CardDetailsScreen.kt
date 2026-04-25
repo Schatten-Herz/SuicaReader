@@ -25,16 +25,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.asComposeRenderEffect
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.lerp
-import android.os.Build
-import android.graphics.Shader
 import com.example.suicareader.data.db.entity.TripRecord
 import com.example.suicareader.ui.MainViewModel
 import com.example.suicareader.ui.components.GlassCard
@@ -74,10 +69,16 @@ fun CardDetailsScreen(
     
     var currentTrips by remember { mutableStateOf<List<TripRecord>>(emptyList()) }
     var pendingClickTripId by remember { mutableStateOf<Long?>(null) }
+    var enableReorder by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     
     LaunchedEffect(dbTrips) {
         currentTrips = dbTrips
+    }
+
+    LaunchedEffect(Unit) {
+        delay(220)
+        enableReorder = true
     }
 
     val lazyListState = rememberLazyListState()
@@ -152,7 +153,8 @@ fun CardDetailsScreen(
             label = "card_height"
         )
         
-        Box(modifier = Modifier.fillMaxSize().blur(blurRadius)) {
+        val contentModifier = if (blurRadius > 0.dp) Modifier.fillMaxSize().blur(blurRadius) else Modifier.fillMaxSize()
+        Box(modifier = contentModifier) {
             
             // Trip History List
             LazyColumn(
@@ -190,7 +192,89 @@ fun CardDetailsScreen(
                             }
                         }
                         is TripRecord -> {
-                            ReorderableItem(reorderableState, key = "trip_${item.id}") { isDragging ->
+                            if (enableReorder) {
+                                ReorderableItem(reorderableState, key = "trip_${item.id}") { isDragging ->
+                                    val transactionName = when (item.type) {
+                                        0x01 -> strings.fareSubway
+                                        0x02 -> strings.chargeTopUp
+                                        0x0F, 0x0D -> strings.busFare
+                                        0x46 -> strings.purchase
+                                        0x50 -> "Locker"
+                                        else -> "Transaction (0x${"%02X".format(item.type)})"
+                                    }
+                                    
+                                    val amountColor = if (item.amount > 0) Color(0xFF4CAF50) else Color(0xFFE53935)
+                                    val amountPrefix = if (item.amount > 0) "+" else ""
+                                    
+                                    val inDisplay = item.inStationName ?: item.inStation
+                                    val outDisplay = item.outStationName ?: item.outStation
+
+                                    val detailText = when (item.type) {
+                                        0x02 -> "${strings.locationPrefix} $inDisplay"
+                                        0x0F, 0x0D -> "${strings.busRoutePrefix} $inDisplay"
+                                        0x46 -> "${strings.terminalPrefix} $inDisplay"
+                                        0x50 -> item.note?.takeIf { it.isNotBlank() } ?: "Locker usage"
+                                        else -> "${strings.inPrefix} $inDisplay\n${strings.outPrefix} $outDisplay"
+                                    }
+
+                                    val interactionSource = remember { MutableInteractionSource() }
+                                    val isPressed by interactionSource.collectIsPressedAsState()
+                                    val pressScale by animateFloatAsState(
+                                        targetValue = if (isPressed || isDragging || pendingClickTripId == item.id) 0.95f else 1f,
+                                        label = "trip_press_scale"
+                                    )
+
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .scale(pressScale)
+                                            .clickable(
+                                                interactionSource = interactionSource,
+                                                indication = null
+                                            ) {
+                                                if (pendingClickTripId != null) return@clickable
+                                                pendingClickTripId = item.id
+                                                scope.launch {
+                                                    delay(110)
+                                                    onTripClick(item)
+                                                    pendingClickTripId = null
+                                                }
+                                            }
+                                            .longPressDraggableHandle(
+                                                onDragStarted = { },
+                                                onDragStopped = {
+                                                    // Save changes to DB when drag stops
+                                                    val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+                                                    val dateStr = dateFormat.format(Date(item.timestamp))
+                                                    val dayTrips = currentTrips.filter { dateFormat.format(Date(it.timestamp)) == dateStr }
+                                                    viewModel.reorderTripsWithinDay(cardIdm, dayTrips)
+                                                }
+                                            ),
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = Color.White.copy(alpha = if (isDragging) 0.3f else 0.1f)
+                                        )
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(item.customTitle ?: transactionName, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(detailText, color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp, maxLines = 2)
+                                            }
+                                            
+                                            Column(horizontalAlignment = Alignment.End) {
+                                                Text("$amountPrefix¥${item.amount}", color = amountColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text("${strings.balanceLabel} ¥${item.balance}", color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp)
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
                                 val transactionName = when (item.type) {
                                     0x01 -> strings.fareSubway
                                     0x02 -> strings.chargeTopUp
@@ -217,7 +301,7 @@ fun CardDetailsScreen(
                                 val interactionSource = remember { MutableInteractionSource() }
                                 val isPressed by interactionSource.collectIsPressedAsState()
                                 val pressScale by animateFloatAsState(
-                                    targetValue = if (isPressed || isDragging || pendingClickTripId == item.id) 0.95f else 1f,
+                                    targetValue = if (isPressed || pendingClickTripId == item.id) 0.95f else 1f,
                                     label = "trip_press_scale"
                                 )
 
@@ -236,20 +320,10 @@ fun CardDetailsScreen(
                                                 onTripClick(item)
                                                 pendingClickTripId = null
                                             }
-                                        }
-                                        .longPressDraggableHandle(
-                                            onDragStarted = { },
-                                            onDragStopped = { 
-                                                // Save changes to DB when drag stops
-                                                val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                                                val dateStr = dateFormat.format(Date(item.timestamp))
-                                                val dayTrips = currentTrips.filter { dateFormat.format(Date(it.timestamp)) == dateStr }
-                                                viewModel.reorderTripsWithinDay(cardIdm, dayTrips)
-                                            }
-                                        ),
+                                        },
                                     shape = RoundedCornerShape(16.dp),
                                     colors = CardDefaults.cardColors(
-                                        containerColor = Color.White.copy(alpha = if (isDragging) 0.3f else 0.1f)
+                                        containerColor = Color.White.copy(alpha = 0.1f)
                                     )
                                 ) {
                                     Row(
@@ -282,24 +356,16 @@ fun CardDetailsScreen(
                     .fillMaxWidth()
                     .height(110.dp + maxCardHeightDp + 48.dp) // Cover the expanded header area
             ) {
-                // Soften the transition from top overlay to clear list area.
+                // Lightweight top overlay to avoid costly per-frame blur during scroll.
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(220.dp)
-                        .graphicsLayer {
-                            compositingStrategy = CompositingStrategy.Offscreen
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                renderEffect = android.graphics.RenderEffect
-                                    .createBlurEffect(48f, 48f, Shader.TileMode.CLAMP)
-                                    .asComposeRenderEffect()
-                            }
-                        }
                         .background(
                             Brush.verticalGradient(
                                 colors = listOf(
-                                    Color.White.copy(alpha = 0.22f),
-                                    Color.White.copy(alpha = 0.12f),
+                                    Color.White.copy(alpha = 0.16f),
+                                    Color.White.copy(alpha = 0.08f),
                                     Color.Transparent
                                 )
                             )
