@@ -60,8 +60,11 @@ fun ManualEntryDialog(
     var showTypePicker by remember { mutableStateOf(false) }
 
     var pickingFor by remember { mutableStateOf<String?>(null) } // "IN" or "OUT"
+    var pendingStationName by remember { mutableStateOf<String?>(null) }
+    var pendingStationFor by remember { mutableStateOf<String?>(null) } // "IN" or "OUT"
     var showBusPicker by remember { mutableStateOf(false) }
-    val isSubLayerOpen = pickingFor != null || showBusPicker || showTypePicker || showDatePicker
+    val isSubLayerOpen =
+        pickingFor != null || pendingStationName != null || showBusPicker || showTypePicker || showDatePicker
 
     val strings = com.example.suicareader.ui.theme.LocalStrings.current
     val textColor = com.example.suicareader.ui.theme.LocalTextColor.current
@@ -69,9 +72,31 @@ fun ManualEntryDialog(
     if (pickingFor != null) {
         StationPickerDialog(
             onDismiss = { pickingFor = null },
-            onStationSelected = { station ->
-                if (pickingFor == "IN") inStation = station else outStation = station
+            onStationSelected = { stationName ->
+                pendingStationName = stationName
+                pendingStationFor = pickingFor
                 pickingFor = null
+            }
+        )
+    }
+
+    if (pendingStationName != null && pendingStationFor != null) {
+        StationCompanyPickerDialog(
+            stationName = pendingStationName!!,
+            onDismiss = {
+                pendingStationName = null
+                pendingStationFor = null
+            },
+            onCompanySelected = { companyOption ->
+                val stationName = pendingStationName!!
+                val stationPair = if (companyOption == null) {
+                    stationName to stationName // User chose "unknown company"
+                } else {
+                    companyOption.stationCode to "$stationName (${companyOption.companyShortName})"
+                }
+                if (pendingStationFor == "IN") inStation = stationPair else outStation = stationPair
+                pendingStationName = null
+                pendingStationFor = null
             }
         )
     }
@@ -95,7 +120,7 @@ fun ManualEntryDialog(
                 modifier = Modifier
                     .fillMaxWidth(0.85f)
                     .clip(RoundedCornerShape(20.dp))
-                    .glassSurface(cornerRadius = 20.dp, fillAlpha = 0.22f)
+                    .glassSurface(level = GlassLevel.Overlay, cornerRadius = 20.dp)
                     .padding(16.dp)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -161,23 +186,13 @@ fun ManualEntryDialog(
             modifier = Modifier
                 .fillMaxWidth(0.9f)
                 .clip(RoundedCornerShape(24.dp))
-                .background(Color.White.copy(alpha = 0.15f))
-                .border(
-                    width = 1.dp,
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.5f),
-                            Color.White.copy(alpha = 0.05f)
-                        )
-                    ),
-                    shape = RoundedCornerShape(24.dp)
-                )
+                    .glassSurface(level = GlassLevel.Overlay, cornerRadius = 24.dp)
         ) {
             // High blur layer
             Box(
                 modifier = Modifier
                     .matchParentSize()
-                    .blur(50.dp)
+                    .blur(40.dp)
                     .background(Color.White.copy(alpha = 0.1f))
             )
             
@@ -185,7 +200,7 @@ fun ManualEntryDialog(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .blur(if (isSubLayerOpen) 14.dp else 0.dp)
+                        .blur(if (isSubLayerOpen) 40.dp else 0.dp)
                 ) {
                     Column {
                 Text(strings.addManualEntry, color = textColor, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
@@ -196,7 +211,7 @@ fun ManualEntryDialog(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .glassSurface(cornerRadius = 12.dp, fillAlpha = 0.14f, borderAlphaStrong = 0.35f, borderAlphaWeak = 0.08f)
+                            .glassSurface(level = GlassLevel.SurfaceSecondary, cornerRadius = 12.dp)
                         .clickable { showDatePicker = true },
                     color = Color.Transparent,
                     shape = RoundedCornerShape(12.dp)
@@ -218,7 +233,7 @@ fun ManualEntryDialog(
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .glassSurface(cornerRadius = 12.dp, fillAlpha = 0.14f, borderAlphaStrong = 0.35f, borderAlphaWeak = 0.08f)
+                            .glassSurface(level = GlassLevel.SurfaceSecondary, cornerRadius = 12.dp)
                             .clickable { showTypePicker = true },
                         color = Color.Transparent,
                         shape = RoundedCornerShape(12.dp)
@@ -426,23 +441,11 @@ enum class EntryType {
 @Composable
 fun StationPickerDialog(
     onDismiss: () -> Unit,
-    onStationSelected: (Pair<String, String>) -> Unit
+    onStationSelected: (String) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
-    var selectedCompany by remember { mutableStateOf<String?>(null) }
-    
-    val companyFilters = remember {
-        listOf(
-            "東日本旅客鉄道",
-            "東京メトロ",
-            "東京都交通局",
-            "京急電鉄",
-            "京成電鉄",
-            "東急電鉄"
-        )
-    }
-
-    val results = remember(query, selectedCompany) { StationResolver.searchStations(query, selectedCompany) }
+    val results = remember(query) { StationResolver.searchStationNames(query) }
+    val popularStations = remember { StationResolver.popularStationNames() }
     val strings = com.example.suicareader.ui.theme.LocalStrings.current
     val textColor = com.example.suicareader.ui.theme.LocalTextColor.current
 
@@ -490,57 +493,50 @@ fun StationPickerDialog(
                 )
                 
                 Spacer(modifier = Modifier.height(12.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilterChip(
-                        selected = selectedCompany == null,
-                        onClick = { selectedCompany = null },
-                        label = { Text(strings.allLabel) }
-                    )
-                    companyFilters.forEach { company ->
-                        FilterChip(
-                            selected = selectedCompany == company,
-                            onClick = {
-                                selectedCompany = if (selectedCompany == company) null else company
-                            },
-                            label = { Text(company, maxLines = 1) }
-                        )
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(12.dp))
                 
                 LazyColumn(modifier = Modifier.weight(1f)) {
                     if (query.isBlank()) {
-                        item {
-                            Text(
-                                text = strings.searchPlaceholder,
-                                color = textColor.copy(alpha = 0.55f),
-                                modifier = Modifier.padding(16.dp)
-                            )
+                        if (popularStations.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = "热门站点",
+                                    color = textColor.copy(alpha = 0.72f),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
+                                )
+                            }
+                            items(popularStations.size) { i ->
+                                val stationName = popularStations[i]
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { onStationSelected(stationName) }
+                                        .padding(vertical = 12.dp)
+                                ) {
+                                    Text(stationName, color = textColor, fontWeight = FontWeight.Medium)
+                                }
+                                HorizontalDivider(color = textColor.copy(alpha = 0.1f))
+                            }
+                        } else {
+                            item {
+                                Text(
+                                    text = strings.searchPlaceholder,
+                                    color = textColor.copy(alpha = 0.55f),
+                                    modifier = Modifier.padding(16.dp)
+                                )
+                            }
                         }
                     } else {
                         items(results.size) { i ->
-                            val station = results[i]
-                            val stationName = station.second.substringBefore(" (")
-                            val company = station.second.substringAfter("(", "").substringBefore(")")
+                            val stationName = results[i]
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { onStationSelected(station) }
+                                    .clickable { onStationSelected(stationName) }
                                     .padding(vertical = 12.dp)
                             ) {
-                                Column {
-                                    Text(stationName, color = textColor, fontWeight = FontWeight.Medium)
-                                    if (company.isNotBlank()) {
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(company, color = textColor.copy(alpha = 0.6f), fontSize = 12.sp)
-                                    }
-                                }
+                                Text(stationName, color = textColor, fontWeight = FontWeight.Medium)
                             }
                             HorizontalDivider(color = textColor.copy(alpha = 0.1f))
                         }
@@ -552,6 +548,84 @@ fun StationPickerDialog(
                     }
                 }
             }
+            }
+        }
+    }
+}
+
+@Composable
+fun StationCompanyPickerDialog(
+    stationName: String,
+    onDismiss: () -> Unit,
+    onCompanySelected: (StationResolver.StationCompanyOption?) -> Unit
+) {
+    val textColor = com.example.suicareader.ui.theme.LocalTextColor.current
+    val companies = remember(stationName) { StationResolver.companyOptionsForStation(stationName) }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.35f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.88f)
+                    .clip(RoundedCornerShape(24.dp))
+                    .glassSurface(level = GlassLevel.Overlay, cornerRadius = 24.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .blur(40.dp)
+                        .background(Color.White.copy(alpha = 0.08f))
+                )
+
+                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                    Text(
+                        text = stationName,
+                        color = textColor,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "请选择铁路公司（或留空）",
+                        color = textColor.copy(alpha = 0.7f),
+                        fontSize = 13.sp
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onCompanySelected(null) }
+                                    .padding(vertical = 12.dp)
+                            ) {
+                                Text("无", color = textColor, fontWeight = FontWeight.Medium)
+                            }
+                            HorizontalDivider(color = textColor.copy(alpha = 0.1f))
+                        }
+                        items(companies.size) { i ->
+                            val company = companies[i]
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onCompanySelected(company) }
+                                    .padding(vertical = 12.dp)
+                            ) {
+                                Text(company.companyShortName, color = textColor, fontWeight = FontWeight.Medium)
+                            }
+                            HorizontalDivider(color = textColor.copy(alpha = 0.1f))
+                        }
+                    }
+                }
             }
         }
     }

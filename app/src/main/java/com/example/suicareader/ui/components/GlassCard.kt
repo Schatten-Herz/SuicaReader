@@ -21,6 +21,7 @@ import com.example.suicareader.ui.theme.Motion
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
+    level: GlassLevel = GlassLevel.SurfacePrimary,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
@@ -42,7 +43,7 @@ fun GlassCard(
                 scaleX = scale
                 scaleY = scale
             }
-            .glassSurface(cornerRadius = 24.dp)
+            .glassSurface(level = level, cornerRadius = 24.dp)
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null, // 去掉默认波纹，配合果冻缩放

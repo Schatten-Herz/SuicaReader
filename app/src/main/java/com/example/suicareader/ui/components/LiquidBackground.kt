@@ -2,6 +2,7 @@ package com.example.suicareader.ui.components
 
 import android.graphics.RuntimeShader
 import android.os.Build
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -16,8 +17,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.unit.dp
 import org.intellij.lang.annotations.Language
 
 @Language("AGSL")
@@ -61,22 +65,80 @@ fun LiquidBackground(
         val transition = rememberInfiniteTransition(label = "time")
         val time by transition.animateFloat(
             initialValue = 0f,
-            targetValue = 10f,
+            targetValue = 12f,
             animationSpec = infiniteRepeatable(
-                animation = tween(15000, easing = LinearEasing),
+                animation = tween(18000, easing = LinearEasing),
                 repeatMode = RepeatMode.Restart
             ),
             label = "time"
         )
-        
-        Canvas(modifier = modifier.fillMaxSize()) {
-            shader.setFloatUniform("iResolution", size.width, size.height)
-            shader.setFloatUniform("iTime", time)
-            shader.setFloatUniform("baseColor", baseColor.red, baseColor.green, baseColor.blue, baseColor.alpha)
-            drawRect(brush = ShaderBrush(shader))
+        val drift by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(22000, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "drift"
+        )
+
+        Box(modifier = modifier.fillMaxSize()) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                shader.setFloatUniform("iResolution", size.width, size.height)
+                shader.setFloatUniform("iTime", time)
+                shader.setFloatUniform("baseColor", baseColor.red, baseColor.green, baseColor.blue, baseColor.alpha)
+                drawRect(brush = ShaderBrush(shader))
+            }
+
+            // Mid layer: fluid caustic-like gradients (heavy blur equivalent)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(40.dp)
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.20f),
+                                Color.Transparent
+                            ),
+                            center = androidx.compose.ui.geometry.Offset(
+                                x = 260f + drift * 420f,
+                                y = 180f + drift * 120f
+                            ),
+                            radius = 520f
+                        )
+                    )
+            )
+
+            // Front layer: subtle contrast veil for readability
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.10f),
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.16f)
+                            )
+                        )
+                    )
+            )
         }
     } else {
         // Fallback for API < 33
-        Box(modifier = modifier.fillMaxSize().background(baseColor))
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            baseColor.copy(alpha = 0.95f),
+                            baseColor.copy(alpha = 0.80f),
+                            Color(0xFF11131A)
+                        )
+                    )
+                )
+        )
     }
 }

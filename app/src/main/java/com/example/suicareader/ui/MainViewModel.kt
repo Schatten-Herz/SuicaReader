@@ -7,12 +7,15 @@ import com.example.suicareader.data.db.dao.CardDao
 import com.example.suicareader.data.db.entity.TransitCard
 import com.example.suicareader.nfc.StationResolver
 import com.example.suicareader.nfc.FeliCaParser
+import org.json.JSONArray
+import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.random.Random
 
 class MainViewModel(private val cardDao: CardDao) : ViewModel() {
@@ -86,14 +89,14 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
                 cardDao.insertCard(
                     TransitCard(
                         idm = testIdm,
-                        nickname = "Suica Card [Test]",
+                        nickname = "Suica Card [Sample]",
                         balance = 2400,
                         themeColor = 0xFF4CAF50,
                         lastUpdated = System.currentTimeMillis()
                     )
                 )
-            } else if (!existing.nickname.contains("test", ignoreCase = true)) {
-                cardDao.updateCard(existing.copy(nickname = "Suica Card [Test]"))
+            } else if (!existing.nickname.contains("Sample", ignoreCase = true)) {
+                cardDao.updateCard(existing.copy(nickname = "Suica Card [Sample]"))
             }
 
             val existingTrips = cardDao.getTripsListForCard(testIdm)
@@ -340,6 +343,92 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
     fun getTripsForCard(idm: String) = cardDao.getTripsForCard(idm)
 
     fun getTripById(tripId: Long) = cardDao.getTripById(tripId)
+
+    suspend fun buildTripExportJson(idm: String): String {
+        val trips = cardDao.getTripsListForCard(idm)
+        val payload = JSONObject().apply {
+            put("version", 1)
+            put("cardIdm", idm)
+            put("exportedAt", System.currentTimeMillis())
+            put("trips", JSONArray().apply {
+                trips.forEach { trip ->
+                    put(
+                        JSONObject().apply {
+                            put("timestamp", trip.timestamp)
+                            put("type", trip.type)
+                            put("inStation", trip.inStation)
+                            put("outStation", trip.outStation)
+                            put("inStationName", trip.inStationName ?: JSONObject.NULL)
+                            put("outStationName", trip.outStationName ?: JSONObject.NULL)
+                            put("amount", trip.amount)
+                            put("balance", trip.balance)
+                            put("blockHex", trip.blockHex)
+                            put("customTitle", trip.customTitle ?: JSONObject.NULL)
+                            put("note", trip.note ?: JSONObject.NULL)
+                        }
+                    )
+                }
+            })
+        }
+        return payload.toString(2)
+    }
+
+    fun importTripsFromJson(idm: String, jsonText: String, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val root = JSONObject(jsonText)
+                val tripsArray = root.optJSONArray("trips") ?: JSONArray()
+                if (tripsArray.length() == 0) return@runCatching
+                val now = System.currentTimeMillis()
+                val importedTrips = mutableListOf<com.example.suicareader.data.db.entity.TripRecord>()
+                fun JSONObject.optNullableString(key: String): String? {
+                    if (isNull(key)) return null
+                    return optString(key, "").takeIf { it.isNotBlank() && it != "null" }
+                }
+                for (i in 0 until tripsArray.length()) {
+                    val obj = tripsArray.optJSONObject(i) ?: continue
+                    val timestamp = obj.optLong("timestamp", now + i)
+                    val type = obj.optInt("type", 0x01)
+                    val inStation = obj.optString("inStation", "")
+                    val outStation = obj.optString("outStation", "")
+                    val inStationName = obj.optNullableString("inStationName")
+                    val outStationName = obj.optNullableString("outStationName")
+                    val amount = obj.optInt("amount", 0)
+                    val balance = obj.optInt("balance", 0)
+                    val blockHexRaw = obj.optString("blockHex", "")
+                    val blockHex = if (blockHexRaw.isBlank()) {
+                        "IMPORT-${timestamp}-${i}"
+                    } else {
+                        "$blockHexRaw-IMP"
+                    }
+                    val customTitle = obj.optNullableString("customTitle")
+                    val note = obj.optNullableString("note")
+                    importedTrips += com.example.suicareader.data.db.entity.TripRecord(
+                        cardIdm = idm,
+                        timestamp = timestamp,
+                        type = type,
+                        inStation = inStation,
+                        outStation = outStation,
+                        inStationName = inStationName,
+                        outStationName = outStationName,
+                        amount = amount,
+                        balance = balance,
+                        blockHex = blockHex,
+                        customTitle = customTitle,
+                        note = note
+                    )
+                }
+                if (importedTrips.isNotEmpty()) {
+                    cardDao.insertTrips(importedTrips)
+                    recalculateBalances(idm)
+                }
+            }.onSuccess {
+                withContext(Dispatchers.Main) { onDone(true) }
+            }.onFailure {
+                withContext(Dispatchers.Main) { onDone(false) }
+            }
+        }
+    }
 
     fun updateTripDetails(trip: com.example.suicareader.data.db.entity.TripRecord, newTitle: String, newNote: String) {
         viewModelScope.launch(Dispatchers.IO) {

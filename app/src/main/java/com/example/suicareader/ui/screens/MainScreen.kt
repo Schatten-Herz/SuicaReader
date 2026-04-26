@@ -42,6 +42,7 @@ import com.example.suicareader.ui.theme.LocalStrings
 import com.example.suicareader.ui.theme.LocalTextColor
 import com.example.suicareader.ui.theme.Motion
 import com.example.suicareader.ui.components.glassSurface
+import com.example.suicareader.ui.components.GlassLevel
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -119,7 +120,7 @@ fun GlassBottomBar(
         Box(
             modifier = Modifier
                 .height(64.dp) // Fixed height for consistency
-                .glassSurface(cornerRadius = 50.dp, fillAlpha = 0.12f, borderAlphaStrong = 0.35f, borderAlphaWeak = 0.06f)
+                .glassSurface(level = GlassLevel.Overlay, cornerRadius = 50.dp)
                 .padding(6.dp) // Padding for the indicator to breathe
         ) {
             // Animated Indicator Pill

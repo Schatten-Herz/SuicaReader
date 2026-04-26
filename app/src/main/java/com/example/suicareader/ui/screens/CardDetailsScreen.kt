@@ -5,6 +5,8 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -16,6 +18,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ImportExport
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,13 +29,17 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.lerp
+import androidx.compose.ui.zIndex
 import com.example.suicareader.data.db.entity.TripRecord
 import com.example.suicareader.ui.MainViewModel
 import com.example.suicareader.ui.components.GlassCard
+import com.example.suicareader.ui.components.GlassLevel
+import com.example.suicareader.ui.components.glassSurface
 import com.example.suicareader.ui.theme.LocalStrings
 import com.example.suicareader.ui.theme.LocalTextColor
 import sh.calvin.reorderable.*
@@ -41,6 +48,8 @@ import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -53,6 +62,7 @@ fun CardDetailsScreen(
     onBackClick: () -> Unit,
     onTripClick: (TripRecord) -> Unit
 ) {
+    val context = LocalContext.current
     val cards by viewModel.cards.collectAsState()
     val card = cards.find { it.idm == cardIdm }
     
@@ -60,8 +70,9 @@ fun CardDetailsScreen(
     val textColor = LocalTextColor.current
     
     var showManualEntry by remember { mutableStateOf(false) }
+    var showTransferMenu by remember { mutableStateOf(false) }
     val blurRadius by animateDpAsState(
-        targetValue = if (showManualEntry) 24.dp else 0.dp,
+        targetValue = if (showManualEntry || showTransferMenu) 40.dp else 0.dp,
         label = "blur"
     )
 
@@ -70,7 +81,41 @@ fun CardDetailsScreen(
     var currentTrips by remember { mutableStateOf<List<TripRecord>>(emptyList()) }
     var pendingClickTripId by remember { mutableStateOf<Long?>(null) }
     var enableReorder by remember { mutableStateOf(false) }
+    var operationMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val success = runCatching {
+                val json = withContext(Dispatchers.IO) { viewModel.buildTripExportJson(cardIdm) }
+                context.contentResolver.openOutputStream(uri)?.use { output ->
+                    output.write(json.toByteArray(Charsets.UTF_8))
+                } ?: error("Cannot open output stream")
+            }.isSuccess
+            operationMessage = if (success) "行程导出成功" else "行程导出失败"
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val text = runCatching {
+                context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+            }.getOrNull()
+            if (text.isNullOrBlank()) {
+                operationMessage = "导入文件无效"
+                return@launch
+            }
+            viewModel.importTripsFromJson(cardIdm, text) { success ->
+                operationMessage = if (success) "行程导入成功，已自动重算余额" else "行程导入失败"
+            }
+        }
+    }
     
     LaunchedEffect(dbTrips) {
         currentTrips = dbTrips
@@ -396,17 +441,28 @@ fun CardDetailsScreen(
                 Column(
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Spacer(modifier = Modifier.height(48.dp))
-                    IconButton(onClick = {
-                        scope.launch {
-                            if (lazyListState.firstVisibleItemIndex > 0 || lazyListState.firstVisibleItemScrollOffset > 0) {
-                                lazyListState.animateScrollToItem(0, 0)
-                                delay(120)
+                    Spacer(modifier = Modifier.height(40.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = {
+                            scope.launch {
+                                if (lazyListState.firstVisibleItemIndex > 0 || lazyListState.firstVisibleItemScrollOffset > 0) {
+                                    lazyListState.animateScrollToItem(0, 0)
+                                    delay(120)
+                                }
+                                onBackClick()
                             }
-                            onBackClick()
+                        }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = strings.back, tint = textColor)
                         }
-                    }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = strings.back, tint = textColor)
+                        IconButton(onClick = { showTransferMenu = true }) {
+                            Icon(Icons.Default.ImportExport, contentDescription = "Trip import/export", tint = textColor)
+                        }
                     }
 
                     with(sharedTransitionScope) {
@@ -418,6 +474,7 @@ fun CardDetailsScreen(
                                     rememberSharedContentState(key = "card-$cardIdm"),
                                     animatedVisibilityScope = animatedVisibilityScope
                                 ),
+                            level = GlassLevel.SurfacePrimary,
                             onClick = { /* Flip animation placeholder */ }
                         ) {
                             // Golden ratio applied to typography
@@ -476,6 +533,95 @@ fun CardDetailsScreen(
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold
                         )
+                    }
+                }
+            }
+        }
+
+        operationMessage?.let { msg ->
+            LaunchedEffect(msg) {
+                delay(2200)
+                operationMessage = null
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = 96.dp),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.Black.copy(alpha = 0.42f)
+                ) {
+                    Text(
+                        text = msg,
+                        color = Color.White,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        }
+
+        if (showTransferMenu) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(20f)
+                    .background(Color.Black.copy(alpha = 0.26f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { showTransferMenu = false },
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.8f)
+                        .clip(RoundedCornerShape(22.dp))
+                        .glassSurface(level = GlassLevel.Overlay, cornerRadius = 22.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { }
+                        .padding(14.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("导入 / 导出", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showTransferMenu = false
+                                    importLauncher.launch("application/json")
+                                },
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color.White.copy(alpha = 0.10f)
+                        ) {
+                            Text(
+                                text = "导入行程数据",
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+                            )
+                        }
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showTransferMenu = false
+                                    val name = (card?.nickname?.ifBlank { "card" } ?: "card")
+                                        .replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                                    exportLauncher.launch("${name}_trips.suica.json")
+                                },
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color.White.copy(alpha = 0.10f)
+                        ) {
+                            Text(
+                                text = "导出当前卡片行程",
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+                            )
+                        }
                     }
                 }
             }

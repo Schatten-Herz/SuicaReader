@@ -34,6 +34,7 @@ import com.example.suicareader.ui.theme.LocalStrings
 import com.example.suicareader.ui.theme.LocalTextColor
 
 import androidx.compose.foundation.lazy.rememberLazyListState
+import com.example.suicareader.ui.components.GlassLevel
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -52,7 +53,7 @@ fun DashboardScreen(
 
     val isDialogOpen = cardToEdit.value != null || cardToDelete.value != null
     val blurRadius by animateDpAsState(
-        targetValue = if (isDialogOpen) 24.dp else 0.dp,
+        targetValue = if (isDialogOpen) 40.dp else 0.dp,
         animationSpec = tween(durationMillis = 300),
         label = "dialog_blur"
     )
@@ -87,6 +88,7 @@ fun DashboardScreen(
                                         rememberSharedContentState(key = "card-${card.idm}"),
                                         animatedVisibilityScope = animatedVisibilityScope
                                     ),
+                                level = GlassLevel.SurfacePrimary,
                                 onClick = { onCardClick(card.idm) },
                                 onLongClick = { cardToEdit.value = card } // Changed to show menu
                             ) {

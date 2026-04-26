@@ -25,6 +25,8 @@ import com.example.suicareader.ui.theme.*
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
 import com.example.suicareader.ui.components.LiquidBackground
 
 private object Routes {
@@ -56,6 +58,20 @@ fun AppNavigation(viewModel: MainViewModel, themeViewModel: ThemeViewModel = vie
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             LiquidBackground(baseColor = Color(0xFF1E1E1E))
+            // Readability veil: keeps contrast stable above high-detail background.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.08f),
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.14f)
+                            )
+                        )
+                    )
+            )
             SharedTransitionLayout {
                 NavHost(navController = navController, startDestination = Routes.Main) {
                     composable(

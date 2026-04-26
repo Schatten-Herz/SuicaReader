@@ -157,6 +157,8 @@ object StationResolver {
         }
     }
 
+    fun shortCompanyName(company: String): String = shortenCompanyName(company)
+
     fun searchStations(query: String, companyFilter: String? = null): List<Pair<String, String>> {
         val map = stations ?: return emptyList()
         val q = query.trim()
@@ -194,6 +196,79 @@ object StationResolver {
                 }
             }.thenBy { it.second.length })
             .take(300)
+            .toList()
+    }
+
+    fun searchStationNames(query: String): List<String> {
+        val q = query.trim()
+        if (q.isBlank()) return emptyList()
+        return searchStations(q, null)
+            .map { it.second.substringBefore(" (").trim() }
+            .distinct()
+            .take(200)
+    }
+
+    fun popularStationNames(): List<String> {
+        val map = stations ?: return emptyList()
+        val popular = listOf("東京", "新宿", "渋谷", "池袋", "品川", "秋葉原", "上野", "横浜")
+        val available = map.values
+            .asSequence()
+            .map { it.substringBefore(" (").trim() }
+            .toSet()
+        return popular.filter { available.contains(it) }
+    }
+
+    data class StationCompanyOption(
+        val stationCode: String,
+        val companyShortName: String
+    )
+
+    fun companyOptionsForStation(stationName: String): List<StationCompanyOption> {
+        val map = stations ?: return emptyList()
+        return map.entries
+            .asSequence()
+            .map { it.key to it.value }
+            .filter { (_, displayName) ->
+                displayName.substringBefore(" (").trim() == stationName
+            }
+            .mapNotNull { (code, displayName) ->
+                val companyAndLine = displayName.substringAfter("(", "").substringBefore(")").trim()
+                val company = companyAndLine.substringBefore(" ").trim()
+                if (company.isBlank()) null else StationCompanyOption(code, shortCompanyName(company))
+            }
+            .distinctBy { it.companyShortName }
+            .sortedBy { it.companyShortName }
+            .toList()
+    }
+
+    fun recommendedStations(companyFilter: String? = null): List<Pair<String, String>> {
+        val map = stations ?: return emptyList()
+        val popularStationNames = listOf(
+            "東京",
+            "新宿",
+            "渋谷",
+            "池袋",
+            "品川",
+            "秋葉原",
+            "上野",
+            "横浜"
+        )
+
+        return popularStationNames
+            .asSequence()
+            .flatMap { station ->
+                map.entries
+                    .asSequence()
+                    .map { it.key to it.value }
+                    .filter { (_, displayName) ->
+                        val stationOnly = displayName.substringBefore(" (").trim()
+                        val matchesStation = stationOnly == station
+                        val matchesCompany = companyFilter == null || displayName.contains(companyFilter, ignoreCase = true)
+                        matchesStation && matchesCompany
+                    }
+                    .take(1)
+            }
+            .distinctBy { it.second }
             .toList()
     }
 

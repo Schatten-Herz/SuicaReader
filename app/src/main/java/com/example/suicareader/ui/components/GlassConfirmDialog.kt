@@ -1,15 +1,13 @@
 package com.example.suicareader.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -38,55 +36,51 @@ fun GlassConfirmDialog(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth(0.85f)
-                .clip(RoundedCornerShape(24.dp))
-                .background(Color.White.copy(alpha = 0.15f))
-                .border(
-                    width = 1.dp,
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.5f),
-                            Color.White.copy(alpha = 0.05f)
-                        ),
-                        start = Offset(0f, 0f),
-                        end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
-                    ),
-                    shape = RoundedCornerShape(24.dp)
-                )
-                .padding(24.dp)
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.24f))
+                .blur(40.dp),
+            contentAlignment = androidx.compose.ui.Alignment.Center
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth()
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.85f)
+                    .clip(RoundedCornerShape(24.dp))
+                    .glassSurface(level = GlassLevel.Overlay, cornerRadius = 24.dp)
+                    .padding(24.dp)
             ) {
-                Text(
-                    text = title,
-                    color = Color.White,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-
-                Text(
-                    text = message,
-                    color = Color.White.copy(alpha = 0.8f),
-                    fontSize = 16.sp,
-                    lineHeight = 24.sp,
-                    modifier = Modifier.padding(bottom = 24.dp)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                Column(
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    TextButton(onClick = onDismissRequest) {
-                        Text(strings.cancel, color = Color.White.copy(alpha = 0.7f))
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Button(
-                        onClick = onConfirmClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f))
+                    Text(
+                        text = title,
+                        color = Color.White,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    Text(
+                        text = message,
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 16.sp,
+                        lineHeight = 24.sp,
+                        modifier = Modifier.padding(bottom = 24.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
                     ) {
-                        Text(confirmText, color = confirmColor, fontWeight = FontWeight.Bold)
+                        TextButton(onClick = onDismissRequest) {
+                            Text(strings.cancel, color = Color.White.copy(alpha = 0.78f))
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Button(
+                            onClick = onConfirmClick,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f))
+                        ) {
+                            Text(confirmText, color = confirmColor, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }

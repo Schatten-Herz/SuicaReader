@@ -1,7 +1,6 @@
 package com.example.suicareader.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,9 +13,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -44,60 +42,54 @@ fun GlassMenuDialog(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth(0.85f)
-                .clip(RoundedCornerShape(24.dp))
-                // 毛玻璃半透明背景
-                .background(Color.White.copy(alpha = 0.15f))
-                // 边框高光折射
-                .border(
-                    width = 1.dp,
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color.White.copy(alpha = 0.5f),
-                            Color.White.copy(alpha = 0.05f)
-                        ),
-                        start = Offset(0f, 0f),
-                        end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
-                    ),
-                    shape = RoundedCornerShape(24.dp)
-                )
-                .padding(16.dp)
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.24f))
+                .blur(40.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth()
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.85f)
+                    .clip(RoundedCornerShape(24.dp))
+                    .glassSurface(level = GlassLevel.Overlay, cornerRadius = 24.dp)
+                    .padding(16.dp)
             ) {
-                Text(
-                    text = title,
-                    color = Color.White,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 16.dp, start = 8.dp)
-                )
+                Column(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = title,
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 16.dp, start = 8.dp)
+                    )
 
-                // 菜单项：编辑
-                GlassMenuItem(
-                    icon = Icons.Default.Edit,
-                    text = editText,
-                    textColor = Color.White.copy(alpha = 0.9f),
-                    iconColor = Color.White.copy(alpha = 0.9f),
-                    onClick = {
-                        onEditClick()
-                    }
-                )
+                    // 菜单项：编辑
+                    GlassMenuItem(
+                        icon = Icons.Default.Edit,
+                        text = editText,
+                        textColor = Color.White.copy(alpha = 0.9f),
+                        iconColor = Color.White.copy(alpha = 0.9f),
+                        onClick = {
+                            onEditClick()
+                        }
+                    )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                // 菜单项：删除
-                GlassMenuItem(
-                    icon = Icons.Default.Delete,
-                    text = deleteText,
-                    textColor = Color(0xFFFF5252), // 红色警示
-                    iconColor = Color(0xFFFF5252),
-                    onClick = {
-                        onDeleteClick()
-                        onDismissRequest()
-                    }
-                )
+                    // 菜单项：删除
+                    GlassMenuItem(
+                        icon = Icons.Default.Delete,
+                        text = deleteText,
+                        textColor = Color(0xFFFF5252), // 红色警示
+                        iconColor = Color(0xFFFF5252),
+                        onClick = {
+                            onDeleteClick()
+                            onDismissRequest()
+                        }
+                    )
+                }
             }
         }
     }
@@ -115,7 +107,7 @@ fun GlassMenuItem(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(Color.White.copy(alpha = 0.05f))
+            .glassSurface(level = GlassLevel.SurfaceSecondary, cornerRadius = 16.dp)
             .clickable(onClick = onClick)
             .padding(vertical = 16.dp, horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically

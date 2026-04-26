@@ -1,6 +1,5 @@
 package com.example.suicareader.ui.screens
 
-import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -50,7 +49,9 @@ import com.example.suicareader.ui.components.glassSurface
 import com.example.suicareader.ui.map.TransitMapCatalog
 import com.example.suicareader.ui.theme.LocalStrings
 import com.example.suicareader.ui.theme.LocalTextColor
+import com.example.suicareader.ui.theme.Motion
 import com.example.suicareader.ui.components.GlassCard
+import com.example.suicareader.ui.components.GlassLevel
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
@@ -66,7 +67,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.delay
-import androidx.compose.animation.core.spring
 
 @Composable
 fun TripDetailsScreen(
@@ -98,10 +98,7 @@ fun TripDetailsScreen(
     var stretchOffset by remember { mutableStateOf(0f) }
     val animatedStretch by animateFloatAsState(
         targetValue = stretchOffset,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
+        animationSpec = Motion.RubberBandLight,
         label = "trip_limit_stretch"
     )
     val noteLength = trip?.note?.length ?: 0
@@ -150,7 +147,7 @@ fun TripDetailsScreen(
             .pointerInput(Unit) {
                 detectVerticalDragGestures(
                     onVerticalDrag = { _, dragAmount ->
-                        val next = (stretchOffset + dragAmount * 0.35f).coerceIn(-90f, 90f)
+                        val next = (stretchOffset + dragAmount * 0.2f).coerceIn(-56f, 56f)
                         stretchOffset = next
                     },
                     onDragEnd = {
@@ -165,13 +162,13 @@ fun TripDetailsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .blur(if (isSubLayerOpen) 14.dp else 0.dp)
+                .blur(if (isSubLayerOpen) 40.dp else 0.dp)
                 .padding(horizontal = 16.dp)
                 .graphicsLayer {
                     val offsetAbs = kotlin.math.abs(animatedStretch)
-                    val stretchScale = 1f + (offsetAbs / 900f)
+                    val stretchScale = 1f + (offsetAbs / 1800f)
                     scaleY = stretchScale
-                    translationY = animatedStretch * 0.25f
+                    translationY = animatedStretch * 0.12f
                     transformOrigin = if (animatedStretch >= 0f) {
                         TransformOrigin(0.5f, 0f)
                     } else {
@@ -197,6 +194,7 @@ fun TripDetailsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(mapWeight),
+                level = GlassLevel.SurfacePrimary,
                 onClick = {}
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
@@ -288,6 +286,7 @@ fun TripDetailsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(detailsWeight),
+                level = GlassLevel.SurfaceSecondary,
                 onClick = {}
             ) {
                 if (trip == null) {
@@ -343,6 +342,7 @@ fun TripDetailsScreen(
             Spacer(modifier = Modifier.height(12.dp))
             GlassCard(
                 modifier = Modifier.fillMaxWidth(),
+                level = GlassLevel.SurfaceSecondary,
                 onClick = { showNoteDialog = true }
             ) {
                 Text(
