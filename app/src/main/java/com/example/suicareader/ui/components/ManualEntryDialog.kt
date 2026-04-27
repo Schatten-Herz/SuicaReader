@@ -186,7 +186,8 @@ fun ManualEntryDialog(
             modifier = Modifier
                 .fillMaxWidth(0.9f)
                 .clip(RoundedCornerShape(24.dp))
-                    .glassSurface(level = GlassLevel.Overlay, cornerRadius = 24.dp)
+                .glassSurface(level = GlassLevel.Overlay, cornerRadius = 24.dp)
+                .blur(if (isSubLayerOpen) 14.dp else 0.dp)
         ) {
             // High blur layer
             Box(
@@ -499,7 +500,7 @@ fun StationPickerDialog(
                         if (popularStations.isNotEmpty()) {
                             item {
                                 Text(
-                                    text = "热门站点",
+                                    text = strings.popularStations,
                                     color = textColor.copy(alpha = 0.72f),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold,
@@ -559,6 +560,7 @@ fun StationCompanyPickerDialog(
     onDismiss: () -> Unit,
     onCompanySelected: (StationResolver.StationCompanyOption?) -> Unit
 ) {
+    val strings = com.example.suicareader.ui.theme.LocalStrings.current
     val textColor = com.example.suicareader.ui.theme.LocalTextColor.current
     val companies = remember(stationName) { StationResolver.companyOptionsForStation(stationName) }
 
@@ -594,7 +596,7 @@ fun StationCompanyPickerDialog(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "请选择铁路公司（或留空）",
+                        text = strings.selectRailCompany,
                         color = textColor.copy(alpha = 0.7f),
                         fontSize = 13.sp
                     )
@@ -608,7 +610,7 @@ fun StationCompanyPickerDialog(
                                     .clickable { onCompanySelected(null) }
                                     .padding(vertical = 12.dp)
                             ) {
-                                Text("无", color = textColor, fontWeight = FontWeight.Medium)
+                                Text(strings.noneLabel, color = textColor, fontWeight = FontWeight.Medium)
                             }
                             HorizontalDivider(color = textColor.copy(alpha = 0.1f))
                         }

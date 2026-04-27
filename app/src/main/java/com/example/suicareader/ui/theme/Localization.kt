@@ -82,7 +82,20 @@ data class AppStrings(
     val selectBusCompany: String,
     val selectRechargeStation: String,
     val allLabel: String,
-    val selectBusCompanyTitle: String
+    val selectBusCompanyTitle: String,
+    val importExportTitle: String,
+    val importTrips: String,
+    val exportCurrentTrips: String,
+    val tripExportSuccess: String,
+    val tripExportFailed: String,
+    val tripImportInvalid: String,
+    val tripImportSuccess: String,
+    val tripImportFailed: String,
+    val popularStations: String,
+    val selectRailCompany: String,
+    val noneLabel: String,
+    val lastUpdatedLabel: String,
+    val tripCapacityHint: String
 )
 
 val EnStrings = AppStrings(
@@ -163,7 +176,20 @@ val EnStrings = AppStrings(
     selectBusCompany = "Select Bus Company",
     selectRechargeStation = "Select Recharge Station",
     allLabel = "All",
-    selectBusCompanyTitle = "Select Bus Company"
+    selectBusCompanyTitle = "Select Bus Company",
+    importExportTitle = "Import / Export",
+    importTrips = "Import trip data",
+    exportCurrentTrips = "Export current card trips",
+    tripExportSuccess = "Trips exported successfully",
+    tripExportFailed = "Trip export failed",
+    tripImportInvalid = "Invalid import file",
+    tripImportSuccess = "Trips imported successfully, balance recalculated",
+    tripImportFailed = "Trip import failed",
+    popularStations = "Popular stations",
+    selectRailCompany = "Select rail company (or skip)",
+    noneLabel = "None",
+    lastUpdatedLabel = "Last updated",
+    tripCapacityHint = "The card stores up to 20 trips, please update in time."
 )
 
 val ZhStrings = AppStrings(
@@ -244,7 +270,20 @@ val ZhStrings = AppStrings(
     selectBusCompany = "选择公交公司",
     selectRechargeStation = "选择充值车站",
     allLabel = "全部",
-    selectBusCompanyTitle = "选择公交公司"
+    selectBusCompanyTitle = "选择公交公司",
+    importExportTitle = "导入 / 导出",
+    importTrips = "导入行程数据",
+    exportCurrentTrips = "导出当前卡片行程",
+    tripExportSuccess = "行程导出成功",
+    tripExportFailed = "行程导出失败",
+    tripImportInvalid = "导入文件无效",
+    tripImportSuccess = "行程导入成功，已自动重算余额",
+    tripImportFailed = "行程导入失败",
+    popularStations = "热门站点",
+    selectRailCompany = "请选择铁路公司（或留空）",
+    noneLabel = "无",
+    lastUpdatedLabel = "上次更新时间",
+    tripCapacityHint = "卡内最多存储20条行程数据，请及时更新。"
 )
 
 val JaStrings = AppStrings(
@@ -325,7 +364,20 @@ val JaStrings = AppStrings(
     selectBusCompany = "バス会社を選択",
     selectRechargeStation = "チャージ駅を選択",
     allLabel = "すべて",
-    selectBusCompanyTitle = "バス会社を選択"
+    selectBusCompanyTitle = "バス会社を選択",
+    importExportTitle = "インポート / エクスポート",
+    importTrips = "履歴データをインポート",
+    exportCurrentTrips = "このカードの履歴をエクスポート",
+    tripExportSuccess = "履歴のエクスポートに成功しました",
+    tripExportFailed = "履歴のエクスポートに失敗しました",
+    tripImportInvalid = "インポートファイルが無効です",
+    tripImportSuccess = "履歴をインポートし、残高を再計算しました",
+    tripImportFailed = "履歴のインポートに失敗しました",
+    popularStations = "よく使う駅",
+    selectRailCompany = "鉄道会社を選択（未選択可）",
+    noneLabel = "なし",
+    lastUpdatedLabel = "最終更新",
+    tripCapacityHint = "カードには最大20件まで履歴が保存されます。早めに更新してください。"
 )
 
 val LocalStrings = staticCompositionLocalOf { EnStrings }

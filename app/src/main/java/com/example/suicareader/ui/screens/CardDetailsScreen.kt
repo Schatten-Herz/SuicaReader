@@ -1,10 +1,15 @@
 package com.example.suicareader.ui.screens
 
 import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -26,8 +31,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -46,6 +53,7 @@ import sh.calvin.reorderable.*
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.max
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
@@ -95,7 +103,7 @@ fun CardDetailsScreen(
                     output.write(json.toByteArray(Charsets.UTF_8))
                 } ?: error("Cannot open output stream")
             }.isSuccess
-            operationMessage = if (success) "行程导出成功" else "行程导出失败"
+            operationMessage = if (success) strings.tripExportSuccess else strings.tripExportFailed
         }
     }
 
@@ -108,11 +116,11 @@ fun CardDetailsScreen(
                 context.contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
             }.getOrNull()
             if (text.isNullOrBlank()) {
-                operationMessage = "导入文件无效"
+                operationMessage = strings.tripImportInvalid
                 return@launch
             }
             viewModel.importTripsFromJson(cardIdm, text) { success ->
-                operationMessage = if (success) "行程导入成功，已自动重算余额" else "行程导入失败"
+                operationMessage = if (success) strings.tripImportSuccess else strings.tripImportFailed
             }
         }
     }
@@ -195,6 +203,15 @@ fun CardDetailsScreen(
 
         val rawFraction = if (maxScrollPx > 0) scrollOffsetPx / maxScrollPx else 0f
         val collapseFraction = rawFraction.coerceIn(0f, 1f)
+        val showTripHintCard by remember {
+            derivedStateOf {
+                lazyListState.firstVisibleItemIndex == 0 && lazyListState.firstVisibleItemScrollOffset < 56
+            }
+        }
+        var hintCardHeightPx by remember { mutableIntStateOf(0) }
+        val hintCardHeightDp = with(density) { hintCardHeightPx.toDp() }
+        val reservedHintHeight = max(hintCardHeightDp.value, 56f).dp
+        val headerOverlayHeight = 110.dp + maxCardHeightDp + reservedHintHeight + 72.dp
         
         val targetCardHeightDp = lerp(maxCardHeightDp, minCardHeightDp, collapseFraction)
         val currentCardHeightDp by animateDpAsState(
@@ -210,7 +227,7 @@ fun CardDetailsScreen(
                 state = lazyListState,
                 // Pad the top so the first item starts below the expanded header
                 contentPadding = PaddingValues(
-                    top = 110.dp + maxCardHeightDp + 32.dp, 
+                    top = headerOverlayHeight - 40.dp,
                     bottom = 100.dp, 
                     start = 16.dp, 
                     end = 16.dp
@@ -235,7 +252,7 @@ fun CardDetailsScreen(
                                     color = textColor.copy(alpha = 0.8f),
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
+                                    modifier = Modifier.padding(top = 0.dp, bottom = 4.dp, start = 4.dp, end = 4.dp)
                                 )
                                 HorizontalDivider(color = textColor.copy(alpha = 0.2f), modifier = Modifier.padding(bottom = 8.dp))
                             }
@@ -403,7 +420,7 @@ fun CardDetailsScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(110.dp + maxCardHeightDp + 48.dp) // Cover the expanded header area
+                    .height(headerOverlayHeight)
             ) {
                 // Lightweight top overlay to avoid costly per-frame blur during scroll.
                 Box(
@@ -461,7 +478,7 @@ fun CardDetailsScreen(
                             Icon(Icons.Default.ArrowBack, contentDescription = strings.back, tint = textColor)
                         }
                         IconButton(onClick = { showTransferMenu = true }) {
-                            Icon(Icons.Default.ImportExport, contentDescription = "Trip import/export", tint = textColor)
+                            Icon(Icons.Default.ImportExport, contentDescription = strings.importExportTitle, tint = textColor)
                         }
                     }
 
@@ -515,21 +532,59 @@ fun CardDetailsScreen(
                         }
                     }
 
+                    AnimatedVisibility(
+                        visible = showTripHintCard,
+                        enter = fadeIn() + expandVertically(),
+                        exit = fadeOut() + shrinkVertically()
+                    ) {
+                        val dateTimeFormat = remember { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()) }
+                        Surface(
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .fillMaxWidth()
+                                .glassSurface(level = GlassLevel.SurfaceSecondary, cornerRadius = 14.dp)
+                                .onSizeChanged { hintCardHeightPx = it.height },
+                            color = Color.Transparent,
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "${strings.lastUpdatedLabel}: ${dateTimeFormat.format(Date(card?.lastUpdated ?: System.currentTimeMillis()))}",
+                                    color = textColor.copy(alpha = 0.9f),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = strings.tripCapacityHint,
+                                    color = textColor.copy(alpha = 0.72f),
+                                    fontSize = 11.sp,
+                                    lineHeight = 14.sp
+                                )
+                            }
+                        }
+                    }
+
                     // Trip History Title
                     val textAlpha = (1f - (collapseFraction * 2f)).coerceIn(0f, 1f)
-                    val textHeight = lerp(40.dp, 0.dp, collapseFraction)
+                    val titleTranslateY = lerp(0.dp, (-10).dp, collapseFraction)
                     
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp)
-                            .padding(top = 16.dp, bottom = 8.dp)
-                            .height(textHeight),
+                            .padding(top = 0.dp, bottom = 0.dp)
+                            .graphicsLayer {
+                                alpha = textAlpha
+                                translationY = with(density) { titleTranslateY.toPx() }
+                            },
                         contentAlignment = Alignment.CenterStart
                     ) {
                         Text(
                             text = strings.tripHistory,
-                            color = textColor.copy(alpha = textAlpha),
+                            color = textColor,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -587,7 +642,7 @@ fun CardDetailsScreen(
                         .padding(14.dp)
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("导入 / 导出", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(strings.importExportTitle, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -599,7 +654,7 @@ fun CardDetailsScreen(
                             color = Color.White.copy(alpha = 0.10f)
                         ) {
                             Text(
-                                text = "导入行程数据",
+                                text = strings.importTrips,
                                 color = Color.White,
                                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
                             )
@@ -617,7 +672,7 @@ fun CardDetailsScreen(
                             color = Color.White.copy(alpha = 0.10f)
                         ) {
                             Text(
-                                text = "导出当前卡片行程",
+                                text = strings.exportCurrentTrips,
                                 color = Color.White,
                                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
                             )

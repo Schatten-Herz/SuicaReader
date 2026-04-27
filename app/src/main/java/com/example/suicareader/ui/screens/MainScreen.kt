@@ -104,9 +104,11 @@ fun GlassBottomBar(
     settingsText: String,
     onNavigate: (String) -> Unit
 ) {
+    val itemWidth = 96.dp
+    val itemSpacing = 6.dp
     val selectedIndex = if (currentRoute == "dashboard") 0 else 1
     val indicatorOffset by androidx.compose.animation.core.animateDpAsState(
-        targetValue = (selectedIndex * (100 + 8)).dp,
+        targetValue = (itemWidth + itemSpacing) * selectedIndex,
         animationSpec = Motion.BottomBarSpring,
         label = "indicator"
     )
@@ -114,28 +116,28 @@ fun GlassBottomBar(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 24.dp, start = 16.dp, end = 16.dp),
+            .padding(bottom = 14.dp, start = 16.dp, end = 16.dp),
         contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
-                .height(64.dp) // Fixed height for consistency
-                .glassSurface(level = GlassLevel.Overlay, cornerRadius = 50.dp)
-                .padding(6.dp) // Padding for the indicator to breathe
+                .height(56.dp)
+                .glassSurface(level = GlassLevel.Overlay, cornerRadius = 28.dp)
+                .padding(4.dp)
         ) {
-            // Animated Indicator Pill
+            // G2-like continuous ellipse indicator with compact vertical spacing.
             Box(
                 modifier = Modifier
                     .offset(x = indicatorOffset)
-                    .width(100.dp)
+                    .width(itemWidth)
                     .fillMaxHeight()
-                    .clip(RoundedCornerShape(50))
+                    .clip(RoundedCornerShape(24.dp))
                     .background(Color.White.copy(alpha = 0.2f))
             )
 
             Row(
                 modifier = Modifier.fillMaxHeight(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(itemSpacing),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 BottomNavItem(
@@ -143,6 +145,7 @@ fun GlassBottomBar(
                     label = dashboardText,
                     selected = selectedIndex == 0,
                     textColor = textColor,
+                    itemWidth = itemWidth,
                     onClick = { onNavigate("dashboard") }
                 )
 
@@ -151,6 +154,7 @@ fun GlassBottomBar(
                     label = settingsText,
                     selected = selectedIndex == 1,
                     textColor = textColor,
+                    itemWidth = itemWidth,
                     onClick = { onNavigate("settings") }
                 )
             }
@@ -164,6 +168,7 @@ fun BottomNavItem(
     label: String,
     selected: Boolean,
     textColor: Color,
+    itemWidth: androidx.compose.ui.unit.Dp,
     onClick: () -> Unit
 ) {
     val contentColor = if (selected) textColor else textColor.copy(alpha = 0.6f)
@@ -179,29 +184,27 @@ fun BottomNavItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
         modifier = Modifier
-            .width(100.dp)
+            .width(itemWidth)
             .fillMaxHeight()
             .scale(scale)
-            .clip(RoundedCornerShape(50))
+            .clip(RoundedCornerShape(24.dp))
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick
             )
     ) {
-        // 微调视觉重心，增加 2dp 顶部间距
-        Spacer(modifier = Modifier.height(2.dp))
         Icon(
             imageVector = icon,
             contentDescription = label,
             tint = contentColor,
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier.size(22.dp)
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(3.dp))
         Text(
             text = label, 
             color = contentColor, 
-            fontSize = 12.sp, 
+            fontSize = 11.sp,
             fontWeight = if (selected) androidx.compose.ui.text.font.FontWeight.Bold else androidx.compose.ui.text.font.FontWeight.Normal,
             style = androidx.compose.ui.text.TextStyle(
                 platformStyle = androidx.compose.ui.text.PlatformTextStyle(includeFontPadding = false)
