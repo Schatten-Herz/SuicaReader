@@ -526,14 +526,26 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
         }
     }
 
-    fun updateTripDetails(trip: com.example.suicareader.data.db.entity.TripRecord, newTitle: String, newNote: String) {
+    fun updateTripDetails(
+        trip: com.example.suicareader.data.db.entity.TripRecord,
+        newTitle: String,
+        newNote: String,
+        newTimestamp: Long,
+        newAmount: Int
+    ) {
         viewModelScope.launch(Dispatchers.IO) {
+            val shouldRecalculate = trip.amount != newAmount || trip.timestamp != newTimestamp
             cardDao.updateTrip(
                 trip.copy(
+                    timestamp = newTimestamp,
+                    amount = newAmount,
                     customTitle = newTitle.takeIf { it.isNotBlank() },
                     note = newNote.takeIf { it.isNotBlank() }
                 )
             )
+            if (shouldRecalculate) {
+                recalculateBalances(trip.cardIdm)
+            }
         }
     }
 

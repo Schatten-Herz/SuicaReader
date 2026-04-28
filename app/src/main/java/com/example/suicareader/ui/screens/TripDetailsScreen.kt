@@ -3,6 +3,7 @@ package com.example.suicareader.ui.screens
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,16 +14,22 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -69,9 +76,10 @@ import java.util.Locale
 import kotlinx.coroutines.delay
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun TripDetailsScreen(
     trip: TripRecord?,
-    onSaveEdit: (TripRecord, String, String) -> Unit,
+    onSaveEdit: (TripRecord, String, String, Long, Int) -> Unit,
     onDeleteTrip: (TripRecord) -> Unit,
     onBackClick: () -> Unit
 ) {
@@ -83,7 +91,12 @@ fun TripDetailsScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showNoteDialog by remember { mutableStateOf(false) }
     var editingTitle by remember(trip?.id, showEditDialog) { mutableStateOf(trip?.customTitle ?: "") }
+    var editingAmount by remember(trip?.id, showEditDialog) { mutableStateOf(trip?.amount?.toString() ?: "0") }
+    val editDateFormat = remember { SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()) }
+    var selectedEditDateMillis by remember(trip?.id, showEditDialog) { mutableStateOf(trip?.timestamp ?: System.currentTimeMillis()) }
+    var showDatePickerDialog by remember { mutableStateOf(false) }
     var editingNote by remember(trip?.id, showEditDialog, showNoteDialog) { mutableStateOf(trip?.note ?: "") }
+    var editValidationMessage by remember(trip?.id, showEditDialog) { mutableStateOf<String?>(null) }
     val isSubLayerOpen = showActionMenu || showEditDialog || showDeleteConfirm || showNoteDialog
     val inStationText = trip?.inStationName ?: trip?.inStation
     val outStationText = trip?.outStationName ?: trip?.outStation
@@ -393,6 +406,7 @@ fun TripDetailsScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth(0.9f)
+                    .widthIn(max = 560.dp)
                     .clip(RoundedCornerShape(24.dp))
                     .glassSurface(cornerRadius = 24.dp, fillAlpha = 0.20f)
                     .background(Color.White.copy(alpha = 0.08f))
@@ -406,12 +420,69 @@ fun TripDetailsScreen(
                         label = { Text(strings.tripNameLabel) },
                         modifier = Modifier.fillMaxWidth()
                     )
+                    OutlinedTextField(
+                        value = editDateFormat.format(Date(selectedEditDateMillis)),
+                        onValueChange = {},
+                        label = { Text(strings.dateLabel) },
+                        placeholder = { Text(strings.dateInputHint) },
+                        readOnly = true,
+                        singleLine = true,
+                        trailingIcon = {
+                            IconButton(onClick = { showDatePickerDialog = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarMonth,
+                                    contentDescription = strings.pickDate
+                                )
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showDatePickerDialog = true }
+                    )
+                    OutlinedTextField(
+                        value = editingAmount,
+                        onValueChange = {
+                            editingAmount = it
+                            editValidationMessage = null
+                        },
+                        label = { Text(strings.amountLabel) },
+                        placeholder = { Text(strings.amountInputHint) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    editValidationMessage?.let { message ->
+                        Text(
+                            text = message,
+                            color = Color(0xFFFF8A80),
+                            fontSize = 12.sp
+                        )
+                    }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         TextButton(onClick = { showEditDialog = false }) { Text(strings.cancel) }
                         Button(
                             onClick = {
-                                onSaveEdit(trip, editingTitle, trip.note ?: "")
-                                showEditDialog = false
+                                val parsedDate = runCatching {
+                                    selectedEditDateMillis
+                                }.getOrNull()
+                                val parsedAmount = editingAmount.trim().toIntOrNull()
+                                when {
+                                    parsedDate == null -> {
+                                        editValidationMessage = strings.invalidDateMessage
+                                    }
+                                    parsedAmount == null -> {
+                                        editValidationMessage = strings.invalidAmountMessage
+                                    }
+                                    else -> {
+                                        onSaveEdit(
+                                            trip,
+                                            editingTitle,
+                                            trip.note ?: "",
+                                            parsedDate,
+                                            parsedAmount
+                                        )
+                                        showEditDialog = false
+                                    }
+                                }
                             },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color.White.copy(alpha = 0.22f),
@@ -424,11 +495,38 @@ fun TripDetailsScreen(
         }
     }
 
+    if (showDatePickerDialog) {
+        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = selectedEditDateMillis)
+        DatePickerDialog(
+            onDismissRequest = { showDatePickerDialog = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let {
+                            selectedEditDateMillis = it
+                        }
+                        showDatePickerDialog = false
+                    }
+                ) {
+                    Text(strings.save)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePickerDialog = false }) {
+                    Text(strings.cancel)
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
     if (showNoteDialog && trip != null) {
         Dialog(onDismissRequest = { showNoteDialog = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth(0.9f)
+                    .widthIn(max = 560.dp)
                     .clip(RoundedCornerShape(24.dp))
                     .glassSurface(cornerRadius = 24.dp, fillAlpha = 0.20f)
                     .background(Color.White.copy(alpha = 0.08f))
@@ -446,7 +544,13 @@ fun TripDetailsScreen(
                         TextButton(onClick = { showNoteDialog = false }) { Text(strings.cancel) }
                         Button(
                             onClick = {
-                                onSaveEdit(trip, trip.customTitle ?: "", editingNote)
+                                onSaveEdit(
+                                    trip,
+                                    trip.customTitle ?: "",
+                                    editingNote,
+                                    trip.timestamp,
+                                    trip.amount
+                                )
                                 showNoteDialog = false
                             },
                             colors = ButtonDefaults.buttonColors(

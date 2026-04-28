@@ -221,16 +221,24 @@ fun JourneyScreen(viewModel: MainViewModel) {
                                 )
                             ) {
                                 val zoom = cameraPositionState.position.zoom.toDouble()
-                                val nationwideRadius =
-                                    2400.0 * (2.0.pow(11.0 - zoom).coerceIn(0.6, 6.0))
+                                val zoomScale = (2.0.pow(11.0 - zoom)).coerceIn(0.7, 8.0)
+                                val nationwideOuterRadius = 5200.0 * zoomScale
+                                val nationwideCoreRadius = 2500.0 * zoomScale
                                 if (selectedCity == CityAll) {
                                     mappedTrips
                                         .flatMap { listOfNotNull(it.start, it.end) }
                                         .forEach { point ->
                                             Circle(
                                                 center = point,
-                                                radius = nationwideRadius,
-                                                fillColor = Color(0x66FF7A59),
+                                                radius = nationwideOuterRadius,
+                                                fillColor = Color(0x40FF7A59),
+                                                strokeColor = Color(0x00FFFFFF),
+                                                strokeWidth = 0f
+                                            )
+                                            Circle(
+                                                center = point,
+                                                radius = nationwideCoreRadius,
+                                                fillColor = Color(0x80FF7A59),
                                                 strokeColor = Color(0x00FFFFFF),
                                                 strokeWidth = 0f
                                             )
@@ -246,15 +254,15 @@ fun JourneyScreen(viewModel: MainViewModel) {
                                             )
                                             Circle(
                                                 center = item.start,
-                                                radius = 220.0,
-                                                fillColor = Color(0xCC4FA3FF),
+                                                radius = 140.0,
+                                                fillColor = Color(0x8C4FA3FF),
                                                 strokeColor = Color(0x00FFFFFF),
                                                 strokeWidth = 0f
                                             )
                                             Circle(
                                                 center = item.end,
-                                                radius = 220.0,
-                                                fillColor = Color(0xCCFF6F61),
+                                                radius = 140.0,
+                                                fillColor = Color(0x8CFF6F61),
                                                 strokeColor = Color(0x00FFFFFF),
                                                 strokeWidth = 0f
                                             )
@@ -559,7 +567,7 @@ private fun JourneyStatCard(
     GlassCard(modifier = modifier, level = GlassLevel.SurfaceSecondary, onClick = {}) {
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
@@ -574,41 +582,46 @@ private fun JourneyStatCard(
                     fontSize = 12.sp
                 )
             }
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-        if (items.isEmpty()) {
-            Text("-", color = textColor.copy(alpha = 0.7f))
-        } else {
-            Column(
+            Spacer(modifier = Modifier.height(2.dp))
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 2.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items.forEachIndexed { index, item ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Color.White.copy(alpha = 0.08f))
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "${index + 1}. ${item.label}",
-                            color = textColor,
-                            fontSize = 13.sp,
-                            modifier = Modifier.weight(1f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = item.count.toString(),
-                            color = textColor.copy(alpha = 0.88f),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                    .height(1.dp)
+                    .background(Color.White.copy(alpha = 0.14f))
+            )
+            Spacer(modifier = Modifier.height(1.dp))
+            if (items.isEmpty()) {
+                Text("-", color = textColor.copy(alpha = 0.7f))
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items.forEachIndexed { index, item ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color.White.copy(alpha = 0.08f))
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "${index + 1}. ${item.label}",
+                                color = textColor,
+                                fontSize = 13.sp,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = item.count.toString(),
+                                color = textColor.copy(alpha = 0.88f),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
             }

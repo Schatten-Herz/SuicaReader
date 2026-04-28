@@ -169,8 +169,8 @@ fun AppNavigation(viewModel: MainViewModel, themeViewModel: ThemeViewModel = vie
                         val trip by viewModel.getTripById(tripId).collectAsState(initial = null)
                         TripDetailsScreen(
                             trip = trip,
-                            onSaveEdit = { source, title, note ->
-                                viewModel.updateTripDetails(source, title, note)
+                            onSaveEdit = { source, title, note, timestamp, amount ->
+                                viewModel.updateTripDetails(source, title, note, timestamp, amount)
                             },
                             onDeleteTrip = { source ->
                                 viewModel.deleteTrip(source)
