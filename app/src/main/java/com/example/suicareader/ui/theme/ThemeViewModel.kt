@@ -10,6 +10,7 @@ import java.util.Locale
 class ThemeViewModel(application: Application) : AndroidViewModel(application) {
     private val prefs = application.getSharedPreferences("suica_prefs", Context.MODE_PRIVATE)
     private val savedLangString = prefs.getString("app_language", null)
+    private val _betaEnabled = MutableStateFlow(prefs.getBoolean("journey_beta_enabled", true))
     private val _currentLanguage = MutableStateFlow(
         savedLangString
             ?.let {
@@ -22,10 +23,16 @@ class ThemeViewModel(application: Application) : AndroidViewModel(application) {
             ?: systemDefaultLanguage()
     )
     val currentLanguage: StateFlow<AppLanguage> = _currentLanguage
+    val betaEnabled: StateFlow<Boolean> = _betaEnabled
 
     fun setLanguage(lang: AppLanguage) {
         _currentLanguage.value = lang
         prefs.edit().putString("app_language", lang.name).apply()
+    }
+
+    fun setBetaEnabled(enabled: Boolean) {
+        _betaEnabled.value = enabled
+        prefs.edit().putBoolean("journey_beta_enabled", enabled).apply()
     }
 
     private fun systemDefaultLanguage(): AppLanguage {

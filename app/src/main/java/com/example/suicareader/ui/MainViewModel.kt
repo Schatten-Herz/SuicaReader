@@ -12,6 +12,8 @@ import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -19,6 +21,15 @@ import kotlinx.coroutines.withContext
 import kotlin.random.Random
 
 class MainViewModel(private val cardDao: CardDao) : ViewModel() {
+    data class JourneyStatItem(
+        val label: String,
+        val count: Int
+    )
+
+    data class JourneyCityItem(
+        val city: String,
+        val count: Int
+    )
 
     // 从数据库读取的所有卡片，并转换为 StateFlow 供 Compose 监听
     val cards: StateFlow<List<TransitCard>> = cardDao.getAllCards()
@@ -342,7 +353,92 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
 
     fun getTripsForCard(idm: String) = cardDao.getTripsForCard(idm)
 
+    fun getTripsForCards(cardIds: List<String>): Flow<List<com.example.suicareader.data.db.entity.TripRecord>> {
+        return if (cardIds.isEmpty()) flowOf(emptyList()) else cardDao.getTripsForCards(cardIds)
+    }
+
+    fun topRouteStats(trips: List<com.example.suicareader.data.db.entity.TripRecord>, topN: Int = 3): List<JourneyStatItem> {
+        return trips
+            .asSequence()
+            .filter { it.type == 0x01 || it.type == 0x0F || it.type == 0x0D }
+            .mapNotNull { trip ->
+                val route = parseLineName(trip.inStationName) ?: parseLineName(trip.outStationName)
+                route?.takeIf { it.isNotBlank() }
+            }
+            .groupingBy { it }
+            .eachCount()
+            .entries
+            .sortedByDescending { it.value }
+            .take(topN)
+            .map { JourneyStatItem(label = it.key, count = it.value) }
+    }
+
+    fun topCompanyStats(trips: List<com.example.suicareader.data.db.entity.TripRecord>, topN: Int = 3): List<JourneyStatItem> {
+        return trips
+            .asSequence()
+            .filter { it.type == 0x01 || it.type == 0x0F || it.type == 0x0D }
+            .mapNotNull { trip ->
+                val company = parseCompanyName(trip.inStationName) ?: parseCompanyName(trip.outStationName)
+                company?.takeIf { it.isNotBlank() }
+            }
+            .groupingBy { it }
+            .eachCount()
+            .entries
+            .sortedByDescending { it.value }
+            .take(topN)
+            .map { JourneyStatItem(label = it.key, count = it.value) }
+    }
+
+    fun cityStats(
+        trips: List<com.example.suicareader.data.db.entity.TripRecord>,
+        cityResolver: (com.example.suicareader.data.db.entity.TripRecord) -> String?
+    ): List<JourneyCityItem> {
+        return trips
+            .asSequence()
+            .mapNotNull { cityResolver(it)?.takeIf { name -> name.isNotBlank() } }
+            .groupingBy { it }
+            .eachCount()
+            .entries
+            .sortedByDescending { it.value }
+            .map { JourneyCityItem(city = it.key, count = it.value) }
+    }
+
     fun getTripById(tripId: Long) = cardDao.getTripById(tripId)
+
+    private fun parseCompanyName(stationName: String?): String? {
+        if (stationName.isNullOrBlank()) return null
+        val token = stationName
+            .substringAfter("(", stationName.substringAfter("（", ""))
+            .substringBefore(")")
+            .substringBefore("）")
+            .substringBefore(" ")
+            .trim()
+        return when (token) {
+            "JR東日本" -> "JR East"
+            "JR東海" -> "JR Central"
+            "JR西日本" -> "JR West"
+            "JR北海道" -> "JR Hokkaido"
+            "JR四国" -> "JR Shikoku"
+            "JR九州" -> "JR Kyushu"
+            "東京メトロ" -> "Tokyo Metro"
+            "都営" -> "Toei"
+            else -> token.ifBlank { null }
+        }
+    }
+
+    private fun parseLineName(stationName: String?): String? {
+        if (stationName.isNullOrBlank()) return null
+        val inParen = stationName
+            .substringAfter("(", stationName.substringAfter("（", ""))
+            .substringBefore(")")
+            .substringBefore("）")
+            .trim()
+        if (inParen.isBlank()) return null
+        val line = inParen.substringAfter(" ", "")
+            .ifBlank { inParen }
+            .replace("線線", "線")
+        return line.ifBlank { null }
+    }
 
     suspend fun buildTripExportJson(idm: String): String {
         val trips = cardDao.getTripsListForCard(idm)

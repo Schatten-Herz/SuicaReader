@@ -35,6 +35,7 @@ import androidx.compose.animation.core.animateDpAsState
 fun SettingsScreen(themeViewModel: ThemeViewModel = androidx.lifecycle.viewmodel.compose.viewModel()) {
     val context = LocalContext.current
     val currentLang by themeViewModel.currentLanguage.collectAsState()
+    val betaEnabled by themeViewModel.betaEnabled.collectAsState()
     
     val strings = LocalStrings.current
     val textColor = LocalTextColor.current
@@ -65,17 +66,37 @@ fun SettingsScreen(themeViewModel: ThemeViewModel = androidx.lifecycle.viewmodel
                     Text(currentLang.name, color = textColor.copy(alpha = 0.7f), fontSize = 12.sp)
                 }
             }
-        if (langExpanded) {
-            LanguageSelectionDialog(
-                onDismiss = { langExpanded = false },
-                onLanguageSelected = { lang ->
-                    themeViewModel.setLanguage(lang)
-                    langExpanded = false
-                },
-                currentLang = currentLang,
-                textColor = textColor
-            )
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color.White.copy(alpha = 0.1f))
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(strings.journeyBetaTitle, color = textColor, fontSize = 18.sp, fontWeight = FontWeight.Medium)
+                    Text(strings.journeyBetaDesc, color = textColor.copy(alpha = 0.7f), fontSize = 12.sp)
+                }
+                Switch(
+                    checked = betaEnabled,
+                    onCheckedChange = { themeViewModel.setBetaEnabled(it) },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = Color.White.copy(alpha = 0.45f),
+                        uncheckedThumbColor = Color.White.copy(alpha = 0.9f),
+                        uncheckedTrackColor = Color.White.copy(alpha = 0.18f)
+                    )
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -97,6 +118,18 @@ fun SettingsScreen(themeViewModel: ThemeViewModel = androidx.lifecycle.viewmodel
                 Text(strings.openSourceDesc, color = textColor.copy(alpha = 0.7f), fontSize = 12.sp)
             }
         }
+    }
+
+    if (langExpanded) {
+        LanguageSelectionDialog(
+            onDismiss = { langExpanded = false },
+            onLanguageSelected = { lang ->
+                themeViewModel.setLanguage(lang)
+                langExpanded = false
+            },
+            currentLang = currentLang,
+            textColor = textColor
+        )
     }
 }
 @Composable

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -56,6 +57,7 @@ fun MainScreen(
     val bottomNavController = rememberNavController()
     val navBackStackEntry by bottomNavController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: "dashboard"
+    val betaEnabled by themeViewModel.betaEnabled.collectAsState()
     
     val strings = LocalStrings.current
     val textColor = LocalTextColor.current
@@ -69,7 +71,9 @@ fun MainScreen(
                     currentRoute = currentRoute,
                     textColor = textColor,
                     dashboardText = strings.dashboardTitle,
+                    journeyText = strings.journeyTitle,
                     settingsText = strings.settingsTitle,
+                    showJourney = betaEnabled,
                     onNavigate = { route ->
                         bottomNavController.navigate(route) {
                             popUpTo(bottomNavController.graph.startDestinationId) { saveState = true }
@@ -91,6 +95,21 @@ fun MainScreen(
                 composable("settings") {
                     SettingsScreen(themeViewModel = themeViewModel)
                 }
+                if (betaEnabled) {
+                    composable("journey") {
+                        JourneyScreen(viewModel = viewModel)
+                    }
+                }
+            }
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(betaEnabled, currentRoute) {
+        if (!betaEnabled && currentRoute == "journey") {
+            bottomNavController.navigate("dashboard") {
+                popUpTo(bottomNavController.graph.startDestinationId) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
             }
         }
     }
@@ -101,12 +120,23 @@ fun GlassBottomBar(
     currentRoute: String,
     textColor: Color,
     dashboardText: String,
+    journeyText: String,
     settingsText: String,
+    showJourney: Boolean,
     onNavigate: (String) -> Unit
 ) {
-    val itemWidth = 96.dp
+    val itemWidth = if (showJourney) 96.dp else 124.dp
     val itemSpacing = 6.dp
-    val selectedIndex = if (currentRoute == "dashboard") 0 else 1
+    val navItems = buildList {
+        add(Triple("dashboard", dashboardText, Icons.Default.Home))
+        if (showJourney) add(Triple("journey", journeyText, Icons.Default.Place))
+        add(Triple("settings", settingsText, Icons.Default.Settings))
+    }
+    val selectedIndex = when (currentRoute) {
+        "dashboard" -> 0
+        "journey" -> if (showJourney) 1 else 0
+        else -> navItems.lastIndex
+    }
     val indicatorOffset by androidx.compose.animation.core.animateDpAsState(
         targetValue = (itemWidth + itemSpacing) * selectedIndex,
         animationSpec = Motion.BottomBarSpring,
@@ -140,23 +170,16 @@ fun GlassBottomBar(
                 horizontalArrangement = Arrangement.spacedBy(itemSpacing),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                BottomNavItem(
-                    icon = Icons.Default.Home,
-                    label = dashboardText,
-                    selected = selectedIndex == 0,
-                    textColor = textColor,
-                    itemWidth = itemWidth,
-                    onClick = { onNavigate("dashboard") }
-                )
-
-                BottomNavItem(
-                    icon = Icons.Default.Settings,
-                    label = settingsText,
-                    selected = selectedIndex == 1,
-                    textColor = textColor,
-                    itemWidth = itemWidth,
-                    onClick = { onNavigate("settings") }
-                )
+                navItems.forEachIndexed { index, item ->
+                    BottomNavItem(
+                        icon = item.third,
+                        label = item.second,
+                        selected = selectedIndex == index,
+                        textColor = textColor,
+                        itemWidth = itemWidth,
+                        onClick = { onNavigate(item.first) }
+                    )
+                }
             }
         }
     }

@@ -95,7 +95,23 @@ data class AppStrings(
     val selectRailCompany: String,
     val noneLabel: String,
     val lastUpdatedLabel: String,
-    val tripCapacityHint: String
+    val tripCapacityHint: String,
+    val journeyTitle: String,
+    val journeyBetaTitle: String,
+    val journeyBetaDesc: String,
+    val journeyFilterCards: String,
+    val journeyNationwide: String,
+    val journeyModeRoutes: String,
+    val journeyModeCompanies: String,
+    val journeyTopCardTitle: String,
+    val journeyTopCardSubtitle: String,
+    val cityTokyo: String,
+    val cityOsaka: String,
+    val cityKyoto: String,
+    val cityYokohama: String,
+    val cityNagoya: String,
+    val cityFukuoka: String,
+    val cityOther: String
 )
 
 val EnStrings = AppStrings(
@@ -189,7 +205,23 @@ val EnStrings = AppStrings(
     selectRailCompany = "Select rail company (or skip)",
     noneLabel = "None",
     lastUpdatedLabel = "Last updated",
-    tripCapacityHint = "The card stores up to 20 trips, please update in time."
+    tripCapacityHint = "The card stores up to 20 trips, please update in time.",
+    journeyTitle = "Journey",
+    journeyBetaTitle = "Journey (Beta)",
+    journeyBetaDesc = "Enable experimental journey features",
+    journeyFilterCards = "Filter cards",
+    journeyNationwide = "Nationwide",
+    journeyModeRoutes = "Rail Routes",
+    journeyModeCompanies = "Rail Companies",
+    journeyTopCardTitle = "Top 3",
+    journeyTopCardSubtitle = "Top Cities",
+    cityTokyo = "Tokyo",
+    cityOsaka = "Osaka",
+    cityKyoto = "Kyoto",
+    cityYokohama = "Yokohama",
+    cityNagoya = "Nagoya",
+    cityFukuoka = "Fukuoka",
+    cityOther = "Other"
 )
 
 val ZhStrings = AppStrings(
@@ -283,7 +315,23 @@ val ZhStrings = AppStrings(
     selectRailCompany = "请选择铁路公司（或留空）",
     noneLabel = "无",
     lastUpdatedLabel = "上次更新时间",
-    tripCapacityHint = "卡内最多存储20条行程数据，请及时更新。"
+    tripCapacityHint = "卡内最多存储20条行程数据，请及时更新。",
+    journeyTitle = "行迹",
+    journeyBetaTitle = "行迹 (Beta)",
+    journeyBetaDesc = "启用实验性行迹功能",
+    journeyFilterCards = "筛选交通卡",
+    journeyNationwide = "全国",
+    journeyModeRoutes = "铁路路线",
+    journeyModeCompanies = "铁路公司",
+    journeyTopCardTitle = "Top 3",
+    journeyTopCardSubtitle = "热门城市",
+    cityTokyo = "东京",
+    cityOsaka = "大阪",
+    cityKyoto = "京都",
+    cityYokohama = "横滨",
+    cityNagoya = "名古屋",
+    cityFukuoka = "福冈",
+    cityOther = "其他"
 )
 
 val JaStrings = AppStrings(
@@ -377,7 +425,23 @@ val JaStrings = AppStrings(
     selectRailCompany = "鉄道会社を選択（未選択可）",
     noneLabel = "なし",
     lastUpdatedLabel = "最終更新",
-    tripCapacityHint = "カードには最大20件まで履歴が保存されます。早めに更新してください。"
+    tripCapacityHint = "カードには最大20件まで履歴が保存されます。早めに更新してください。",
+    journeyTitle = "行跡",
+    journeyBetaTitle = "行跡 (Beta)",
+    journeyBetaDesc = "実験的な行跡機能を有効化",
+    journeyFilterCards = "カードを絞り込む",
+    journeyNationwide = "全国",
+    journeyModeRoutes = "鉄道路線",
+    journeyModeCompanies = "鉄道会社",
+    journeyTopCardTitle = "Top 3",
+    journeyTopCardSubtitle = "人気都市",
+    cityTokyo = "東京",
+    cityOsaka = "大阪",
+    cityKyoto = "京都",
+    cityYokohama = "横浜",
+    cityNagoya = "名古屋",
+    cityFukuoka = "福岡",
+    cityOther = "その他"
 )
 
 val LocalStrings = staticCompositionLocalOf { EnStrings }

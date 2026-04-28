@@ -28,6 +28,9 @@ interface CardDao {
     @Query("SELECT * FROM trip_records WHERE cardIdm = :idm ORDER BY timestamp DESC, id DESC")
     fun getTripsForCard(idm: String): Flow<List<TripRecord>>
 
+    @Query("SELECT * FROM trip_records WHERE cardIdm IN (:cardIds) ORDER BY timestamp DESC, id DESC")
+    fun getTripsForCards(cardIds: List<String>): Flow<List<TripRecord>>
+
     @Query("SELECT * FROM trip_records WHERE id = :tripId LIMIT 1")
     fun getTripById(tripId: Long): Flow<TripRecord?>
 
