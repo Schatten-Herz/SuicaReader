@@ -60,6 +60,14 @@ android {
     buildFeatures {
         compose = true
     }
+
+    // Kuromoji jars both contain the same META-INF file; prevent duplicate resource merge failures.
+    packaging {
+        resources {
+            excludes += "META-INF/CONTRIBUTORS.md"
+            excludes += "META-INF/LICENSE.md"
+        }
+    }
 }
 
 dependencies {
@@ -88,6 +96,9 @@ dependencies {
     implementation("sh.calvin.reorderable:reorderable:2.4.2")
     implementation("com.google.android.gms:play-services-maps:19.2.0")
     implementation("com.google.maps.android:maps-compose:6.1.0")
+    
+    // Station name multi-language search (fallback romaji generation via Kuromoji)
+    implementation("com.atilika.kuromoji:kuromoji-ipadic:0.9.0")
     
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

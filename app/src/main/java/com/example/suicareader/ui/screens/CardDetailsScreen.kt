@@ -542,10 +542,10 @@ fun CardDetailsScreen(
                             modifier = Modifier
                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                                 .fillMaxWidth()
-                                .glassSurface(level = GlassLevel.SurfaceSecondary, cornerRadius = 14.dp)
+                                .glassSurface(level = GlassLevel.SurfaceSecondary, cornerRadius = 24.dp)
                                 .onSizeChanged { hintCardHeightPx = it.height },
                             color = Color.Transparent,
-                            shape = RoundedCornerShape(14.dp)
+                            shape = RoundedCornerShape(24.dp)
                         ) {
                             Column(
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),

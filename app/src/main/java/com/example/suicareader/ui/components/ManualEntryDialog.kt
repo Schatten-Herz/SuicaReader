@@ -18,12 +18,15 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.focus.focusRequester
 import com.example.suicareader.nfc.StationResolver
 import com.example.suicareader.ui.components.glassSurface
 import java.text.SimpleDateFormat
@@ -449,6 +452,13 @@ fun StationPickerDialog(
     val popularStations = remember { StationResolver.popularStationNames() }
     val strings = com.example.suicareader.ui.theme.LocalStrings.current
     val textColor = com.example.suicareader.ui.theme.LocalTextColor.current
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+        keyboardController?.show()
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -490,7 +500,9 @@ fun StationPickerDialog(
                         unfocusedContainerColor = Color.Transparent,
                         focusedContainerColor = Color.Transparent
                     ),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester)
                 )
                 
                 Spacer(modifier = Modifier.height(12.dp))

@@ -389,6 +389,26 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
             .map { JourneyStatItem(label = it.key, count = it.value) }
     }
 
+    fun topStationStats(trips: List<com.example.suicareader.data.db.entity.TripRecord>, topN: Int = 3): List<JourneyStatItem> {
+        // Railway/subway only: type 0x01.
+        return trips
+            .asSequence()
+            .filter { it.type == 0x01 }
+            .flatMap { trip ->
+                listOfNotNull(
+                    parseStationName(trip.inStationName ?: trip.inStation),
+                    parseStationName(trip.outStationName ?: trip.outStation)
+                ).asSequence()
+            }
+            .filter { it.isNotBlank() }
+            .groupingBy { it }
+            .eachCount()
+            .entries
+            .sortedByDescending { it.value }
+            .take(topN)
+            .map { JourneyStatItem(label = it.key, count = it.value) }
+    }
+
     fun cityStats(
         trips: List<com.example.suicareader.data.db.entity.TripRecord>,
         cityResolver: (com.example.suicareader.data.db.entity.TripRecord) -> String?
@@ -438,6 +458,16 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
             .ifBlank { inParen }
             .replace("線線", "線")
         return line.ifBlank { null }
+    }
+
+    private fun parseStationName(stationName: String?): String? {
+        if (stationName.isNullOrBlank()) return null
+        return stationName
+            .substringBefore(" (")
+            .substringBefore("(")
+            .substringBefore("（")
+            .trim()
+            .takeIf { it.isNotBlank() }
     }
 
     suspend fun buildTripExportJson(idm: String): String {
@@ -495,7 +525,7 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
                     val blockHex = if (blockHexRaw.isBlank()) {
                         "IMPORT-${timestamp}-${i}"
                     } else {
-                        "$blockHexRaw-IMP"
+                        blockHexRaw
                     }
                     val customTitle = obj.optNullableString("customTitle")
                     val note = obj.optNullableString("note")

@@ -1,6 +1,7 @@
 package com.example.suicareader.nfc
 
 import android.content.Context
+import com.atilika.kuromoji.ipadic.Tokenizer
 import org.json.JSONObject
 import java.io.InputStreamReader
 import java.util.Locale
@@ -9,6 +10,10 @@ object StationResolver {
     private var stations: Map<String, String>? = null
     private var stationMetaByKey: Map<String, StationMeta>? = null
     private var stationSearchAliasesByName: Map<String, Set<String>>? = null
+    
+    // Kuromoji is heavyweight; build lazily and cache romaji fallbacks per station name.
+    private val kuromojiTokenizer: Tokenizer by lazy { Tokenizer() }
+    private val stationRomajiCache: MutableMap<String, String> = mutableMapOf()
 
     private data class StationMeta(
         val stationName: String,
@@ -285,6 +290,13 @@ object StationResolver {
             val romaji = kanaToRomaji(station)
             if (romaji.isNotBlank()) {
                 aliases.add(normalizeSearchText(romaji))
+            } else {
+                // For pure Kanji station names, kanaToRomaji returns empty.
+                // Use Kuromoji reading to build a romaji fallback.
+                val fallbackRomaji = kuromojiStationToRomaji(station)
+                if (fallbackRomaji.isNotBlank()) {
+                    aliases.add(normalizeSearchText(fallbackRomaji))
+                }
             }
 
             stationAliasesManual[station]
@@ -292,6 +304,34 @@ object StationResolver {
                 ?.forEach { aliases.add(it) }
         }
         return index
+    }
+
+    private fun kuromojiStationToRomaji(station: String): String {
+        stationRomajiCache[station]?.let { return it }
+
+        return try {
+            val tokens = kuromojiTokenizer.tokenize(station)
+            val readingParts = tokens
+                .map { it.getReading() }
+                .asSequence()
+                .map { it.trim() }
+                .filter { it.isNotBlank() && it != "*" }
+                .toList()
+
+            if (readingParts.isEmpty()) {
+                stationRomajiCache[station] = ""
+                ""
+            } else {
+                // Token reading is usually katakana; kanaToRomaji will normalize it.
+                val kana = readingParts.joinToString("")
+                val romaji = kanaToRomaji(kana)
+                stationRomajiCache[station] = romaji
+                romaji
+            }
+        } catch (_: Exception) {
+            stationRomajiCache[station] = ""
+            ""
+        }
     }
 
     private fun toSimplifiedLike(text: String): String {

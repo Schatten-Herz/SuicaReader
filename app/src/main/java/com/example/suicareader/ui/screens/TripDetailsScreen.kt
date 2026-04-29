@@ -281,15 +281,7 @@ fun TripDetailsScreen(
                         }
                     }
 
-                    if (startLatLng == null || endLatLng == null) {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text(
-                                text = strings.mapPreviewComingSoon,
-                                color = Color.White.copy(alpha = 0.75f),
-                                fontSize = 14.sp
-                            )
-                        }
-                    }
+                    // When start/end coordinates are unavailable, simply don't draw markers/lines.
                 }
             }
 

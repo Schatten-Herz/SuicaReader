@@ -75,6 +75,10 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 import kotlin.math.pow
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 private const val CityAll = "__all__"
 private const val CityTokyo = "tokyo"
@@ -111,18 +115,22 @@ fun JourneyScreen(viewModel: MainViewModel) {
         }
     }
     val cityOptions = remember(cityStats, strings) {
-        listOf(CityAll to strings.journeyNationwide) + cityStats.map {
+        val filtered = cityStats.filter { it.city != CityOther }
+        listOf(CityAll to strings.journeyNationwide) + filtered.map {
             it.city to "${cityDisplayLabel(it.city, strings)} (${it.count})"
         }
     }
     val mappedTrips = remember(trips, selectedCity) { mapTripsForCity(trips, selectedCity) }
-    val topCompanies = remember(trips) { viewModel.topCompanyStats(trips, topN = 3) }
+    val topStations = remember(trips) { viewModel.topStationStats(trips, topN = 3) }
     val topCities = remember(cityStats, strings) {
-        cityStats.take(3).map { MainViewModel.JourneyStatItem(cityDisplayLabel(it.city, strings), it.count) }
+        cityStats
+            .filter { it.city != CityOther }
+            .take(3)
+            .map { MainViewModel.JourneyStatItem(cityDisplayLabel(it.city, strings), it.count) }
     }
-    val companyCount = remember(trips) { viewModel.topCompanyStats(trips, topN = Int.MAX_VALUE).size }
-    val cityCount = remember(cityStats) { cityStats.count { it.city != CityOther } }
-    val activeStats = if (analysisMode == AnalysisCompany) topCompanies else topCities
+    val stationCount = remember(trips) { viewModel.topStationStats(trips, topN = Int.MAX_VALUE).size }
+    val cityCount = remember(cityStats) { cityStats.filter { it.city != CityOther }.size }
+    val activeStats = if (analysisMode == AnalysisCompany) topStations else topCities
     val selectedCityLabel = remember(selectedCity, strings) {
         if (selectedCity == CityAll) strings.journeyNationwide else cityDisplayLabel(selectedCity, strings)
     }
@@ -222,23 +230,43 @@ fun JourneyScreen(viewModel: MainViewModel) {
                             ) {
                                 val zoom = cameraPositionState.position.zoom.toDouble()
                                 val zoomScale = (2.0.pow(11.0 - zoom)).coerceIn(0.7, 8.0)
-                                val nationwideOuterRadius = 5200.0 * zoomScale
-                                val nationwideCoreRadius = 2500.0 * zoomScale
-                                if (selectedCity == CityAll) {
+                                val baseRadius = 6000.0 * zoomScale
+                                if (selectedCity == CityAll && zoom < 8.5) {
                                     mappedTrips
                                         .flatMap { listOfNotNull(it.start, it.end) }
                                         .forEach { point ->
                                             Circle(
                                                 center = point,
-                                                radius = nationwideOuterRadius,
-                                                fillColor = Color(0x40FF7A59),
+                                                radius = baseRadius,
+                                                fillColor = Color(0x148B5CF6),
                                                 strokeColor = Color(0x00FFFFFF),
                                                 strokeWidth = 0f
                                             )
                                             Circle(
                                                 center = point,
-                                                radius = nationwideCoreRadius,
-                                                fillColor = Color(0x80FF7A59),
+                                                radius = baseRadius * 0.75,
+                                                fillColor = Color(0x1A3B82F6),
+                                                strokeColor = Color(0x00FFFFFF),
+                                                strokeWidth = 0f
+                                            )
+                                            Circle(
+                                                center = point,
+                                                radius = baseRadius * 0.55,
+                                                fillColor = Color(0x1F10B981),
+                                                strokeColor = Color(0x00FFFFFF),
+                                                strokeWidth = 0f
+                                            )
+                                            Circle(
+                                                center = point,
+                                                radius = baseRadius * 0.35,
+                                                fillColor = Color(0x29F59E0B),
+                                                strokeColor = Color(0x00FFFFFF),
+                                                strokeWidth = 0f
+                                            )
+                                            Circle(
+                                                center = point,
+                                                radius = baseRadius * 0.15,
+                                                fillColor = Color(0x3DEF4444),
                                                 strokeColor = Color(0x00FFFFFF),
                                                 strokeWidth = 0f
                                             )
@@ -338,7 +366,7 @@ fun JourneyScreen(viewModel: MainViewModel) {
                         .weight(1f)
                         .clickable { analysisMode = AnalysisCompany },
                     label = strings.journeyModeCompanies,
-                    value = companyCount.toString(),
+                    value = stationCount.toString(),
                     active = analysisMode == AnalysisCompany,
                     icon = Icons.Default.DirectionsRailway,
                     isCompanyCard = true
@@ -658,17 +686,36 @@ private fun mapTripsForCity(trips: List<TripRecord>, selectedCity: String): List
 
 private fun cityFromLatLng(latLng: LatLng?): String? {
     if (latLng == null) return null
-    val lat = latLng.latitude
-    val lng = latLng.longitude
-    return when {
-        lat in 35.45..35.9 && lng in 139.45..139.95 -> CityTokyo
-        lat in 34.55..34.85 && lng in 135.35..135.7 -> CityOsaka
-        lat in 35.0..35.15 && lng in 135.65..135.9 -> CityKyoto
-        lat in 35.35..35.55 && lng in 139.55..139.75 -> CityYokohama
-        lat in 35.05..35.3 && lng in 136.75..137.05 -> CityNagoya
-        lat in 33.45..33.7 && lng in 130.2..130.55 -> CityFukuoka
-        else -> CityOther
-    }
+    // Pick the nearest major city center. This avoids an explicit "Other" bucket.
+    val tokyo = LatLng(35.681236, 139.767125)
+    val osaka = LatLng(34.693737, 135.502254)
+    val kyoto = LatLng(35.0116, 135.7681)
+    val yokohama = LatLng(35.4437, 139.6380)
+    val nagoya = LatLng(35.1815, 136.9066)
+    val fukuoka = LatLng(33.5904, 130.4017)
+
+    val distances = listOf(
+        CityTokyo to haversineKm(latLng, tokyo),
+        CityOsaka to haversineKm(latLng, osaka),
+        CityKyoto to haversineKm(latLng, kyoto),
+        CityYokohama to haversineKm(latLng, yokohama),
+        CityNagoya to haversineKm(latLng, nagoya),
+        CityFukuoka to haversineKm(latLng, fukuoka),
+    )
+    return distances.minByOrNull { it.second }?.first
+}
+
+private fun haversineKm(a: LatLng, b: LatLng): Double {
+    val earthRadiusKm = 6371.0
+    val dLat = Math.toRadians(b.latitude - a.latitude)
+    val dLon = Math.toRadians(b.longitude - a.longitude)
+    val lat1 = Math.toRadians(a.latitude)
+    val lat2 = Math.toRadians(b.latitude)
+
+    val sinDLat = sin(dLat / 2.0)
+    val sinDLon = sin(dLon / 2.0)
+    val h = sinDLat * sinDLat + cos(lat1) * cos(lat2) * sinDLon * sinDLon
+    return 2.0 * earthRadiusKm * atan2(sqrt(h), sqrt(1.0 - h))
 }
 
 private fun cityDisplayLabel(city: String, strings: com.example.suicareader.ui.theme.AppStrings): String {
