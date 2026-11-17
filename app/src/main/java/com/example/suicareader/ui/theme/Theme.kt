@@ -10,6 +10,13 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.staticCompositionLocalOf
+import com.kyant.backdrop.Backdrop
+
+val LocalBlurPreset = staticCompositionLocalOf<GlassBlurPreset> { GlassBlurPreset.STRONG }
+val LocalAppBackdrop = staticCompositionLocalOf<Backdrop?> { null }
+val LocalOverlayBackdrop = staticCompositionLocalOf<Backdrop?> { null }
+val LocalDialogBackdrop = staticCompositionLocalOf<Backdrop?> { null }
 
 private val DarkColorScheme = darkColorScheme(
     primary = Purple80,

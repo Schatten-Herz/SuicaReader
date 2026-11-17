@@ -7,6 +7,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.util.Locale
 
+enum class GlassBlurPreset {
+    STRONG, WEAK
+}
+
 class ThemeViewModel(application: Application) : AndroidViewModel(application) {
     private val prefs = application.getSharedPreferences("suica_prefs", Context.MODE_PRIVATE)
     private val savedLangString = prefs.getString("app_language", null)
@@ -22,8 +26,16 @@ class ThemeViewModel(application: Application) : AndroidViewModel(application) {
             }
             ?: systemDefaultLanguage()
     )
+    private val savedBlurPreset = prefs.getString("glass_blur_preset", null)
+    private val _blurPreset = MutableStateFlow(
+        savedBlurPreset?.let {
+            try { GlassBlurPreset.valueOf(it) } catch (e: Exception) { GlassBlurPreset.STRONG }
+        } ?: GlassBlurPreset.STRONG
+    )
+
     val currentLanguage: StateFlow<AppLanguage> = _currentLanguage
     val betaEnabled: StateFlow<Boolean> = _betaEnabled
+    val blurPreset: StateFlow<GlassBlurPreset> = _blurPreset
 
     fun setLanguage(lang: AppLanguage) {
         _currentLanguage.value = lang
@@ -33,6 +45,11 @@ class ThemeViewModel(application: Application) : AndroidViewModel(application) {
     fun setBetaEnabled(enabled: Boolean) {
         _betaEnabled.value = enabled
         prefs.edit().putBoolean("journey_beta_enabled", enabled).apply()
+    }
+
+    fun setBlurPreset(preset: GlassBlurPreset) {
+        _blurPreset.value = preset
+        prefs.edit().putString("glass_blur_preset", preset.name).apply()
     }
 
     private fun systemDefaultLanguage(): AppLanguage {

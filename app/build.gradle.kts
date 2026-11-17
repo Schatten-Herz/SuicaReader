@@ -20,12 +20,21 @@ android {
         localPropsFile.inputStream().use { localProps.load(it) }
     }
 
+    val keystorePath = localProps.getProperty("KEYSTORE_PATH", "D:/Backup/Keys/SuicaReader.jks")
+    val keystoreFile = file(keystorePath)
+    val keystorePass = localProps.getProperty("KEYSTORE_PASSWORD", "")
+    val keyAliasProp = localProps.getProperty("KEY_ALIAS", "")
+    val keyPass = localProps.getProperty("KEY_PASSWORD", "")
+    val hasReleaseSigning = keystoreFile.exists() && keystorePass.isNotBlank() && keyAliasProp.isNotBlank() && keyPass.isNotBlank()
+
     signingConfigs {
-        create("release") {
-            storeFile = file("D:/Backup/Keys/SuicaReader.jks")
-            storePassword = localProps.getProperty("KEYSTORE_PASSWORD", "")
-            keyAlias = localProps.getProperty("KEY_ALIAS", "")
-            keyPassword = localProps.getProperty("KEY_PASSWORD", "")
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = keystoreFile
+                storePassword = keystorePass
+                keyAlias = keyAliasProp
+                keyPassword = keyPass
+            }
         }
     }
 
@@ -43,7 +52,9 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
 
             isMinifyEnabled = false
             proguardFiles(
@@ -99,6 +110,9 @@ dependencies {
     
     // Station name multi-language search (fallback romaji generation via Kuromoji)
     implementation("com.atilika.kuromoji:kuromoji-ipadic:0.9.0")
+    
+    // AndroidLiquidGlass
+    implementation(libs.android.liquid.glass)
     
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
