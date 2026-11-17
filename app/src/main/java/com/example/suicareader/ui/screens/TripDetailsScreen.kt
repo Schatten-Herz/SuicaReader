@@ -1,79 +1,58 @@
 package com.example.suicareader.ui.screens
 
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.example.suicareader.data.db.entity.TripRecord
+import com.example.suicareader.ui.components.GlassCard
+import com.example.suicareader.ui.components.GlassConfirmDialog
+import com.example.suicareader.ui.components.GlassDialogPanel
+import com.example.suicareader.ui.components.GlassLevel
+import com.example.suicareader.ui.components.GlassMenuDialog
+import com.example.suicareader.ui.components.GlassOverlayContainer
+import com.example.suicareader.ui.components.TripUiFormatter
+import com.example.suicareader.ui.components.glassOutlinedTextFieldColors
 import com.example.suicareader.ui.components.glassSurface
 import com.example.suicareader.ui.map.TransitMapCatalog
+import com.example.suicareader.ui.theme.LocalAppBackdrop
+import com.example.suicareader.ui.theme.LocalOverlayBackdrop
 import com.example.suicareader.ui.theme.LocalStrings
 import com.example.suicareader.ui.theme.LocalTextColor
 import com.example.suicareader.ui.theme.Motion
-import com.example.suicareader.ui.components.GlassCard
-import com.example.suicareader.ui.components.GlassLevel
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.MapProperties
-import com.google.maps.android.compose.MapUiSettings
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.MarkerState
-import com.google.maps.android.compose.Polyline
-import com.google.maps.android.compose.rememberCameraPositionState
+import com.google.maps.android.compose.*
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlinx.coroutines.delay
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -97,7 +76,7 @@ fun TripDetailsScreen(
     var showDatePickerDialog by remember { mutableStateOf(false) }
     var editingNote by remember(trip?.id, showEditDialog, showNoteDialog) { mutableStateOf(trip?.note ?: "") }
     var editValidationMessage by remember(trip?.id, showEditDialog) { mutableStateOf<String?>(null) }
-    val isSubLayerOpen = showActionMenu || showEditDialog || showDeleteConfirm || showNoteDialog
+
     val inStationText = trip?.inStationName ?: trip?.inStation
     val outStationText = trip?.outStationName ?: trip?.outStation
     val startLatLng = remember(inStationText) { TransitMapCatalog.coordinateForStation(inStationText) }
@@ -124,6 +103,15 @@ fun TripDetailsScreen(
         targetValue = 1.9f + notePressure * 0.6f,
         label = "trip_details_weight"
     )
+
+    val appBackdrop = LocalAppBackdrop.current
+    val pageBackdrop = rememberLayerBackdrop()
+    val overlayBackdrop = if (appBackdrop != null) {
+        rememberCombinedBackdrop(appBackdrop, pageBackdrop)
+    } else {
+        pageBackdrop
+    }
+
     LaunchedEffect(trip?.id) {
         showMapContent = false
         delay(380)
@@ -163,20 +151,18 @@ fun TripDetailsScreen(
                         val next = (stretchOffset + dragAmount * 0.2f).coerceIn(-56f, 56f)
                         stretchOffset = next
                     },
-                    onDragEnd = {
-                        stretchOffset = 0f
-                    },
-                    onDragCancel = {
-                        stretchOffset = 0f
-                    }
+                    onDragEnd = { stretchOffset = 0f },
+                    onDragCancel = { stretchOffset = 0f }
                 )
             }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .blur(if (isSubLayerOpen) 40.dp else 0.dp)
-                .padding(horizontal = 16.dp)
+                .layerBackdrop(pageBackdrop)
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
                 .graphicsLayer {
                     val offsetAbs = kotlin.math.abs(animatedStretch)
                     val stretchScale = 1f + (offsetAbs / 1800f)
@@ -189,16 +175,29 @@ fun TripDetailsScreen(
                     }
                 }
         ) {
-            Spacer(modifier = Modifier.height(48.dp))
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onBackClick) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .glassSurface(level = GlassLevel.SurfaceSecondary, cornerRadius = 21.dp)
+                        .clickable(onClick = onBackClick),
+                    contentAlignment = Alignment.Center
+                ) {
                     Icon(Icons.Default.ArrowBack, contentDescription = strings.back, tint = textColor)
                 }
-                IconButton(onClick = { showActionMenu = true }) {
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .glassSurface(level = GlassLevel.SurfaceSecondary, cornerRadius = 21.dp)
+                        .clickable { showActionMenu = true },
+                    contentAlignment = Alignment.Center
+                ) {
                     Icon(Icons.Default.Edit, contentDescription = strings.editTrip, tint = textColor)
                 }
             }
@@ -252,7 +251,7 @@ fun TripDetailsScreen(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(Color(0x1FFFFFFF))
+                                .background(Color.White.copy(alpha = 0.08f))
                         )
                     }
 
@@ -260,12 +259,13 @@ fun TripDetailsScreen(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(10.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Color.Black.copy(alpha = 0.35f))
-                            .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
+                            .glassSurface(level = GlassLevel.Overlay, cornerRadius = 12.dp)
                             .padding(horizontal = 10.dp, vertical = 6.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
                             Box(
                                 modifier = Modifier
                                     .height(4.dp)
@@ -280,8 +280,6 @@ fun TripDetailsScreen(
                             )
                         }
                     }
-
-                    // When start/end coordinates are unavailable, simply don't draw markers/lines.
                 }
             }
 
@@ -304,14 +302,7 @@ fun TripDetailsScreen(
                 } else {
                     val dateText = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
                         .format(Date(trip.timestamp))
-                    val typeText = when (trip.type) {
-                        0x01 -> strings.fareSubway
-                        0x02 -> strings.chargeTopUp
-                        0x0F, 0x0D -> strings.busFare
-                        0x46 -> strings.purchase
-                        0x50 -> strings.typeLocker
-                        else -> "${strings.transactionLabel} (0x${"%02X".format(trip.type)})"
-                    }
+                    val typeText = TripUiFormatter.transactionTitle(trip.type, strings)
                     val inDisplay = trip.inStationName ?: trip.inStation
                     val outDisplay = trip.outStationName ?: trip.outStation
 
@@ -323,11 +314,11 @@ fun TripDetailsScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(text = dateText, color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp)
-                        Text(text = "${strings.inPrefix} $inDisplay", color = Color.White.copy(alpha = 0.85f), fontSize = 16.sp)
-                        Text(text = "${strings.outPrefix} $outDisplay", color = Color.White.copy(alpha = 0.85f), fontSize = 16.sp)
+                        Text(text = "${strings.inPrefix} $inDisplay", color = Color.White.copy(alpha = 0.88f), fontSize = 16.sp)
+                        Text(text = "${strings.outPrefix} $outDisplay", color = Color.White.copy(alpha = 0.88f), fontSize = 16.sp)
                         Text(
                             text = "${strings.amountLabel}: ${if (trip.amount > 0) "+" else ""}¥${trip.amount}",
-                            color = if (trip.amount > 0) Color(0xFF4CAF50) else Color(0xFFE53935),
+                            color = if (trip.amount > 0) Color(0xFF4ADE80) else Color(0xFFFF6B6B),
                             fontSize = 20.sp,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -338,13 +329,15 @@ fun TripDetailsScreen(
                         )
                         Text(
                             text = "${strings.rawBlockLabel}: ${trip.blockHex}",
-                            color = Color.White.copy(alpha = 0.5f),
+                            color = Color.White.copy(alpha = 0.55f),
                             fontSize = 12.sp
                         )
                     }
                 }
             }
+
             Spacer(modifier = Modifier.height(12.dp))
+
             GlassCard(
                 modifier = Modifier.fillMaxWidth(),
                 level = GlassLevel.SurfaceSecondary,
@@ -352,135 +345,186 @@ fun TripDetailsScreen(
             ) {
                 Text(
                     text = trip?.note?.takeIf { it.isNotBlank() } ?: strings.noNote,
-                    color = Color.White.copy(alpha = 0.85f),
+                    color = Color.White.copy(alpha = 0.88f),
                     fontSize = 13.sp,
                     maxLines = if (noteLength > 180) 4 else 2
                 )
             }
         }
 
-    }
-
-    if (showActionMenu) {
-        com.example.suicareader.ui.components.GlassMenuDialog(
-            onDismissRequest = { showActionMenu = false },
-            onEditClick = {
-                showActionMenu = false
-                showEditDialog = true
-            },
-            onDeleteClick = {
-                showActionMenu = false
-                showDeleteConfirm = true
-            },
-            title = strings.tripOptionsTitle,
-            editText = strings.editTripOption,
-            deleteText = strings.deleteTripOption
-        )
-    }
-
-    if (showDeleteConfirm && trip != null) {
-        com.example.suicareader.ui.components.GlassConfirmDialog(
-            title = strings.deleteTripTitle,
-            message = strings.deleteTripMessage,
-            confirmText = strings.deleteCard,
-            confirmColor = Color(0xFFFF5252),
-            onDismissRequest = { showDeleteConfirm = false },
-            onConfirmClick = {
-                onDeleteTrip(trip)
-                showDeleteConfirm = false
-                onBackClick()
+        CompositionLocalProvider(LocalOverlayBackdrop provides appBackdrop) {
+            if (showActionMenu) {
+                GlassMenuDialog(
+                    onDismissRequest = { showActionMenu = false },
+                    onEditClick = {
+                        showActionMenu = false
+                        showEditDialog = true
+                    },
+                    onDeleteClick = {
+                        showActionMenu = false
+                        showDeleteConfirm = true
+                    },
+                    title = strings.tripOptionsTitle,
+                    editText = strings.editTripOption,
+                    deleteText = strings.deleteTripOption
+                )
             }
-        )
-    }
 
-    if (showEditDialog && trip != null) {
-        Dialog(onDismissRequest = { showEditDialog = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.9f)
-                    .widthIn(max = 560.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .glassSurface(cornerRadius = 24.dp, fillAlpha = 0.20f)
-                    .background(Color.White.copy(alpha = 0.08f))
-                    .padding(20.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text(strings.editTrip, color = textColor, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    OutlinedTextField(
-                        value = editingTitle,
-                        onValueChange = { editingTitle = it },
-                        label = { Text(strings.tripNameLabel) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = editDateFormat.format(Date(selectedEditDateMillis)),
-                        onValueChange = {},
-                        label = { Text(strings.dateLabel) },
-                        placeholder = { Text(strings.dateInputHint) },
-                        readOnly = true,
-                        singleLine = true,
-                        trailingIcon = {
-                            IconButton(onClick = { showDatePickerDialog = true }) {
-                                Icon(
-                                    imageVector = Icons.Default.CalendarMonth,
-                                    contentDescription = strings.pickDate
+            if (showDeleteConfirm && trip != null) {
+                GlassConfirmDialog(
+                    title = strings.deleteTripTitle,
+                    message = strings.deleteTripMessage,
+                    confirmText = strings.deleteCard,
+                    confirmColor = Color(0xFFFF6B6B),
+                    onDismissRequest = { showDeleteConfirm = false },
+                    onConfirmClick = {
+                        onDeleteTrip(trip)
+                        showDeleteConfirm = false
+                        onBackClick()
+                    }
+                )
+            }
+
+            if (showEditDialog && trip != null) {
+                GlassOverlayContainer(onDismissRequest = { showEditDialog = false }) {
+                    GlassDialogPanel(
+                        modifier = Modifier
+                            .fillMaxWidth(0.9f)
+                            .widthIn(max = 520.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                                .padding(22.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Text(strings.editTrip, color = textColor, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                            OutlinedTextField(
+                                value = editingTitle,
+                                onValueChange = { editingTitle = it },
+                                label = { Text(strings.tripNameLabel, color = textColor.copy(alpha = 0.72f)) },
+                                shape = RoundedCornerShape(14.dp),
+                                colors = glassOutlinedTextFieldColors(textColor, unfocusedBorderAlpha = 0.35f),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            OutlinedTextField(
+                                value = editDateFormat.format(Date(selectedEditDateMillis)),
+                                onValueChange = {},
+                                label = { Text(strings.dateLabel, color = textColor.copy(alpha = 0.72f)) },
+                                placeholder = { Text(strings.dateInputHint) },
+                                readOnly = true,
+                                singleLine = true,
+                                shape = RoundedCornerShape(14.dp),
+                                colors = glassOutlinedTextFieldColors(textColor, unfocusedBorderAlpha = 0.35f),
+                                trailingIcon = {
+                                    IconButton(onClick = { showDatePickerDialog = true }) {
+                                        Icon(
+                                            imageVector = Icons.Default.CalendarMonth,
+                                            contentDescription = strings.pickDate,
+                                            tint = textColor
+                                        )
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showDatePickerDialog = true }
+                            )
+                            OutlinedTextField(
+                                value = editingAmount,
+                                onValueChange = {
+                                    editingAmount = it
+                                    editValidationMessage = null
+                                },
+                                label = { Text(strings.amountLabel, color = textColor.copy(alpha = 0.72f)) },
+                                placeholder = { Text(strings.amountInputHint) },
+                                singleLine = true,
+                                shape = RoundedCornerShape(14.dp),
+                                colors = glassOutlinedTextFieldColors(textColor, unfocusedBorderAlpha = 0.35f),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            editValidationMessage?.let { message ->
+                                Text(
+                                    text = message,
+                                    color = Color(0xFFFF8A80),
+                                    fontSize = 12.sp
                                 )
                             }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { showDatePickerDialog = true }
-                    )
-                    OutlinedTextField(
-                        value = editingAmount,
-                        onValueChange = {
-                            editingAmount = it
-                            editValidationMessage = null
-                        },
-                        label = { Text(strings.amountLabel) },
-                        placeholder = { Text(strings.amountInputHint) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    editValidationMessage?.let { message ->
-                        Text(
-                            text = message,
-                            color = Color(0xFFFF8A80),
-                            fontSize = 12.sp
-                        )
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                TextButton(onClick = { showEditDialog = false }) {
+                                    Text(strings.cancel, color = textColor.copy(alpha = 0.75f))
+                                }
+                                Button(
+                                    onClick = {
+                                        val parsedAmount = editingAmount.trim().toIntOrNull()
+                                        if (parsedAmount == null) {
+                                            editValidationMessage = strings.invalidAmountMessage
+                                        } else {
+                                            onSaveEdit(
+                                                trip,
+                                                editingTitle,
+                                                trip.note ?: "",
+                                                selectedEditDateMillis,
+                                                parsedAmount
+                                            )
+                                            showEditDialog = false
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color.White.copy(alpha = 0.22f),
+                                        contentColor = textColor
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) { Text(strings.save) }
+                            }
+                        }
                     }
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { showEditDialog = false }) { Text(strings.cancel) }
-                        Button(
-                            onClick = {
-                                val parsedDate = runCatching {
-                                    selectedEditDateMillis
-                                }.getOrNull()
-                                val parsedAmount = editingAmount.trim().toIntOrNull()
-                                when {
-                                    parsedDate == null -> {
-                                        editValidationMessage = strings.invalidDateMessage
-                                    }
-                                    parsedAmount == null -> {
-                                        editValidationMessage = strings.invalidAmountMessage
-                                    }
-                                    else -> {
+                }
+            }
+
+            if (showNoteDialog && trip != null) {
+                GlassOverlayContainer(onDismissRequest = { showNoteDialog = false }) {
+                    GlassDialogPanel(
+                        modifier = Modifier
+                            .fillMaxWidth(0.9f)
+                            .widthIn(max = 520.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(22.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Text(strings.noteLabel, color = textColor, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                            OutlinedTextField(
+                                value = editingNote,
+                                onValueChange = { editingNote = it },
+                                label = { Text(strings.noteLabel, color = textColor.copy(alpha = 0.72f)) },
+                                shape = RoundedCornerShape(14.dp),
+                                colors = glassOutlinedTextFieldColors(textColor, unfocusedBorderAlpha = 0.35f),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                TextButton(onClick = { showNoteDialog = false }) {
+                                    Text(strings.cancel, color = textColor.copy(alpha = 0.75f))
+                                }
+                                Button(
+                                    onClick = {
                                         onSaveEdit(
                                             trip,
-                                            editingTitle,
-                                            trip.note ?: "",
-                                            parsedDate,
-                                            parsedAmount
+                                            trip.customTitle ?: "",
+                                            editingNote,
+                                            trip.timestamp,
+                                            trip.amount
                                         )
-                                        showEditDialog = false
-                                    }
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color.White.copy(alpha = 0.22f),
-                                contentColor = textColor
-                            )
-                        ) { Text(strings.save) }
+                                        showNoteDialog = false
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color.White.copy(alpha = 0.22f),
+                                        contentColor = textColor
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) { Text(strings.save) }
+                            }
+                        }
                     }
                 }
             }
@@ -510,49 +554,6 @@ fun TripDetailsScreen(
             }
         ) {
             DatePicker(state = datePickerState)
-        }
-    }
-
-    if (showNoteDialog && trip != null) {
-        Dialog(onDismissRequest = { showNoteDialog = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.9f)
-                    .widthIn(max = 560.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .glassSurface(cornerRadius = 24.dp, fillAlpha = 0.20f)
-                    .background(Color.White.copy(alpha = 0.08f))
-                    .padding(20.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text(strings.noteLabel, color = textColor, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    OutlinedTextField(
-                        value = editingNote,
-                        onValueChange = { editingNote = it },
-                        label = { Text(strings.noteLabel) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { showNoteDialog = false }) { Text(strings.cancel) }
-                        Button(
-                            onClick = {
-                                onSaveEdit(
-                                    trip,
-                                    trip.customTitle ?: "",
-                                    editingNote,
-                                    trip.timestamp,
-                                    trip.amount
-                                )
-                                showNoteDialog = false
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color.White.copy(alpha = 0.22f),
-                                contentColor = textColor
-                            )
-                        ) { Text(strings.save) }
-                    }
-                }
-            }
         }
     }
 }

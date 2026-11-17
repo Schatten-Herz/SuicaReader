@@ -1,10 +1,10 @@
 package com.example.suicareader.nfc
 
 import android.nfc.Tag
+import android.nfc.TagLostException
 import android.nfc.tech.NfcF
 import java.io.ByteArrayOutputStream
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
+import java.util.Locale
 
 object FeliCaParser {
 
@@ -25,67 +25,115 @@ object FeliCaParser {
     data class SuicaData(
         val idm: ByteArray,
         val balance: Int,
-        val history: List<ParsedHistory> 
+        val history: List<ParsedHistory>
     )
 
+    sealed class ReadResult {
+        data class Success(val data: SuicaData) : ReadResult()
+        data object TagLost : ReadResult()
+        data class Failed(val error: Throwable? = null) : ReadResult()
+    }
+
     fun readCard(tag: Tag): SuicaData? {
-        val nfcF = NfcF.get(tag) ?: return null
+        return (readCardDetailed(tag) as? ReadResult.Success)?.data
+    }
+
+    fun readCardDetailed(tag: Tag): ReadResult {
+        val nfcF = NfcF.get(tag) ?: return ReadResult.Failed()
         return try {
             nfcF.connect()
-            
-            val tagIdm = tag.id // 对于 FeliCa，NfcF 的 tag ID 即为 IDm (8 bytes)
-            
-            // 物理 Suica 卡片最多只保存最新的 20 条记录。
-            // 由于 FeliCa 单次通讯有长度限制（最多约 15 块），我们需要分两次读取：0-9 块，10-19 块。
-            val command1 = buildReadCommand(tagIdm, SERVICE_CODE_SUICA_HISTORY, 0, 10)
-            val response1 = nfcF.transceive(command1)
-            val history1 = parseResponse(tagIdm, response1) ?: emptyList()
+            runCatching { nfcF.timeout = 1200 }
 
-            val command2 = buildReadCommand(tagIdm, SERVICE_CODE_SUICA_HISTORY, 10, 10)
-            val response2 = nfcF.transceive(command2)
-            val history2 = parseResponse(tagIdm, response2) ?: emptyList()
-            
+            val tagIdm = tag.id
+
+            // Batch 1: blocks 0..9 (newest)
+            val history1 = readRangeWithFallback(nfcF, tagIdm, startBlock = 0, count = 10)
+            if (history1.isEmpty()) {
+                return ReadResult.Failed()
+            }
+
+            // Batch 2: blocks 10..19 (older), tolerant of TagLost or cards with <20 entries
+            val history2 = if (history1.size == 10) {
+                try {
+                    readRangeWithFallback(nfcF, tagIdm, startBlock = 10, count = 10)
+                } catch (_: TagLostException) {
+                    // Keep the newest 10 records we already read cleanly
+                    emptyList()
+                }
+            } else {
+                emptyList()
+            }
+
             val allHistory = history1 + history2
-            
-            // 当前余额取最新的一条（索引0）
             val currentBalance = allHistory.firstOrNull()?.balance ?: 0
-
-            SuicaData(tagIdm, currentBalance, allHistory)
+            ReadResult.Success(SuicaData(tagIdm, currentBalance, allHistory))
+        } catch (e: TagLostException) {
+            ReadResult.TagLost
         } catch (e: Exception) {
             e.printStackTrace()
-            null
+            ReadResult.Failed(e)
         } finally {
-            try { nfcF.close() } catch (e: Exception) {}
+            try {
+                nfcF.close()
+            } catch (_: Exception) {
+            }
         }
     }
 
-    private fun buildReadCommand(idm: ByteArray, serviceCode: Int, startBlock: Int, numBlocks: Int): ByteArray {
+    private fun readRangeWithFallback(
+        nfcF: NfcF,
+        idm: ByteArray,
+        startBlock: Int,
+        count: Int
+    ): List<ParsedHistory> {
+        val batchCmd = buildReadCommand(idm, SERVICE_CODE_SUICA_HISTORY, startBlock, count)
+        val batchResp = nfcF.transceive(batchCmd)
+        val parsedBatch = parseResponse(batchResp)
+        if (parsedBatch != null) {
+            return parsedBatch
+        }
+
+        // Fallback: card may have fewer blocks than requested; read block-by-block until end
+        val singleResults = mutableListOf<ParsedHistory>()
+        for (blockIdx in startBlock until (startBlock + count)) {
+            val cmd = buildReadCommand(idm, SERVICE_CODE_SUICA_HISTORY, blockIdx, 1)
+            val resp = nfcF.transceive(cmd)
+            val parsed = parseResponse(resp) ?: break
+            if (parsed.isEmpty()) break
+            singleResults.addAll(parsed)
+        }
+        return singleResults
+    }
+
+    private fun buildReadCommand(
+        idm: ByteArray,
+        serviceCode: Int,
+        startBlock: Int,
+        numBlocks: Int
+    ): ByteArray {
         val bout = ByteArrayOutputStream()
-        bout.write(0) // 占位符，最后写入长度
+        bout.write(0)
         bout.write(COMMAND_READ_WITHOUT_ENCRYPTION.toInt())
         bout.write(idm)
-        bout.write(1) // Number of Services
-        // Service Code 是 Little Endian 格式发送
+        bout.write(1)
         bout.write(serviceCode and 0xFF)
         bout.write((serviceCode shr 8) and 0xFF)
-        bout.write(numBlocks) // Number of Blocks
+        bout.write(numBlocks)
 
-        // Block List (对于 <= 255 的 block 数，长度为 2 字节)
         for (i in startBlock until startBlock + numBlocks) {
-            bout.write(0x80) // Block Element: 0x80 表示 2-byte block list element
-            bout.write(i)    // Block Number
+            bout.write(0x80)
+            bout.write(i)
         }
 
         val command = bout.toByteArray()
-        command[0] = command.size.toByte() // 设置第一个字节为总长度
+        command[0] = command.size.toByte()
         return command
     }
 
-    private fun parseResponse(idm: ByteArray, response: ByteArray): List<ParsedHistory>? {
-        // Response 格式: Length (1) + Response Code (1) + IDm (8) + Status Flag 1 (1) + Status Flag 2 (1) + Num of Blocks (1) + Block Data (16 * N)
+    private fun parseResponse(response: ByteArray): List<ParsedHistory>? {
         if (response.size < 13) return null
-        if (response[1] != 0x07.toByte()) return null // 0x07 是 Read Without Encryption 的正确 Response Code
-        if (response[10] != 0x00.toByte() || response[11] != 0x00.toByte()) return null // Status Flags 检查
+        if (response[1] != 0x07.toByte()) return null
+        if (response[10] != 0x00.toByte() || response[11] != 0x00.toByte()) return null
 
         val numBlocks = response[12].toInt() and 0xFF
         val historyBlocks = mutableListOf<ParsedHistory>()
@@ -94,34 +142,35 @@ object FeliCaParser {
         for (i in 0 until numBlocks) {
             if (offset + 16 > response.size) break
             val block = response.copyOfRange(offset, offset + 16)
-            
-            // 解析日期 (Byte 4-5)
+            offset += 16
+
+            // Skip empty zero-filled blocks
+            if (block.all { it == 0.toByte() }) continue
+
             val dateValue = ((block[4].toInt() and 0xFF) shl 8) or (block[5].toInt() and 0xFF)
             val year = ((dateValue shr 9) and 0x7F) + 2000
             val month = (dateValue shr 5) and 0x0F
             val day = dateValue and 0x1F
-            val dateString = String.format("%04d-%02d-%02d", year, month, day)
+            val dateString = if (month in 1..12 && day in 1..31) {
+                String.format(Locale.US, "%04d-%02d-%02d", year, month, day)
+            } else {
+                ""
+            }
 
-            // 解析余额 (Byte 10-11, Little Endian)
             val balance = (block[10].toInt() and 0xFF) or ((block[11].toInt() and 0xFF) shl 8)
-
-            // 交易类型 (Byte 1)
             val transactionType = block[1].toInt() and 0xFF
 
-            // 站点代码 (Byte 6-9)
             val inLine = block[6].toInt() and 0xFF
             val inStation = block[7].toInt() and 0xFF
             val outLine = block[8].toInt() and 0xFF
             val outStation = block[9].toInt() and 0xFF
-            val inStationCode = String.format("%02X-%02X", inLine, inStation)
-            val outStationCode = String.format("%02X-%02X", outLine, outStation)
-            
-            // Region is usually at block[15]
+            val inStationCode = String.format(Locale.US, "%02X-%02X", inLine, inStation)
+            val outStationCode = String.format(Locale.US, "%02X-%02X", outLine, outStation)
+
             val regionCode = block[15].toInt() and 0xFF
-            
             val inStationName = StationResolver.getStationName(regionCode, inLine, inStation)
             val outStationName = StationResolver.getStationName(regionCode, outLine, outStation)
-            
+
             val blockHex = block.joinToString("") { "%02X".format(it) }
 
             historyBlocks.add(
@@ -136,7 +185,6 @@ object FeliCaParser {
                     outStationName = outStationName
                 )
             )
-            offset += 16
         }
 
         return historyBlocks

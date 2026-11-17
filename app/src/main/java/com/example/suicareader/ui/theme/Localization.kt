@@ -116,7 +116,20 @@ data class AppStrings(
     val cityYokohama: String,
     val cityNagoya: String,
     val cityFukuoka: String,
-    val cityOther: String
+    val cityOther: String,
+    val nfcReading: String,
+    val nfcReadSuccess: String,
+    val nfcTagLost: String,
+    val nfcUnsupported: String,
+    val nfcReadFailed: String,
+    val glassBlurPreset: String,
+    val blurStrong: String,
+    val blurWeak: String,
+    val noCardsTitle: String,
+    val noCardsDesc: String,
+    val nfcReadyHint: String,
+    val unitStations: String,
+    val unitCities: String
 )
 
 val EnStrings = AppStrings(
@@ -231,7 +244,20 @@ val EnStrings = AppStrings(
     cityYokohama = "Yokohama",
     cityNagoya = "Nagoya",
     cityFukuoka = "Fukuoka",
-    cityOther = "Other"
+    cityOther = "Other",
+    nfcReading = "Reading transit card...",
+    nfcReadSuccess = "Card updated",
+    nfcTagLost = "Card moved too fast, hold steady",
+    nfcUnsupported = "Unsupported NFC tag (FeliCa required)",
+    nfcReadFailed = "Failed to read card, please try again",
+    glassBlurPreset = "Glass Blur Preset",
+    blurStrong = "Strong",
+    blurWeak = "Weak",
+    noCardsTitle = "No Transit Cards Yet",
+    noCardsDesc = "Hold your Suica, PASMO, or ICOCA card against the NFC area on the back of your phone to read balance and trip history.",
+    nfcReadyHint = "Tap card to back of phone to scan",
+    unitStations = "stations",
+    unitCities = "cities"
 )
 
 val ZhStrings = AppStrings(
@@ -346,7 +372,20 @@ val ZhStrings = AppStrings(
     cityYokohama = "横滨",
     cityNagoya = "名古屋",
     cityFukuoka = "福冈",
-    cityOther = "其他"
+    cityOther = "其他",
+    nfcReading = "正在读取交通卡...",
+    nfcReadSuccess = "读卡成功",
+    nfcTagLost = "卡片移开过快，请贴紧重试",
+    nfcUnsupported = "不支持的卡片类型（需 FeliCa 交通卡）",
+    nfcReadFailed = "读卡失败，请贴近手机背部重试",
+    glassBlurPreset = "玻璃模糊强度",
+    blurStrong = "强",
+    blurWeak = "弱",
+    noCardsTitle = "暂无交通卡",
+    noCardsDesc = "请将 Suica、PASMO 或 ICOCA 等日本交通卡贴近手机背部 NFC 感应区，即可读取余额与乘车记录。",
+    nfcReadyHint = "将交通卡贴近手机背部即可读卡",
+    unitStations = "站",
+    unitCities = "个"
 )
 
 val JaStrings = AppStrings(
@@ -461,7 +500,20 @@ val JaStrings = AppStrings(
     cityYokohama = "横浜",
     cityNagoya = "名古屋",
     cityFukuoka = "福岡",
-    cityOther = "その他"
+    cityOther = "その他",
+    nfcReading = "カードを読み取り中...",
+    nfcReadSuccess = "読み取り完了",
+    nfcTagLost = "カードが離れました。動かさずにかざしてください",
+    nfcUnsupported = "非対応のカードです（FeliCa が必要です）",
+    nfcReadFailed = "読み取りに失敗しました。もう一度お試しください",
+    glassBlurPreset = "ガラスのぼかし強度",
+    blurStrong = "強",
+    blurWeak = "弱",
+    noCardsTitle = "カードがまだありません",
+    noCardsDesc = "Suica・PASMO・ICOCA などの交通系 IC カードを端末背面の NFC にかざすと、残高と履歴を読み取れます。",
+    nfcReadyHint = "端末背面にかざして読み取り",
+    unitStations = "駅",
+    unitCities = "都市"
 )
 
 val LocalStrings = staticCompositionLocalOf { EnStrings }

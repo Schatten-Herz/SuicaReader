@@ -10,17 +10,33 @@ import com.example.suicareader.nfc.FeliCaParser
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Locale
+import java.util.TimeZone
 import kotlin.random.Random
 
 class MainViewModel(private val cardDao: CardDao) : ViewModel() {
+    enum class NfcStatus {
+        Reading, Success, TagLost, Unsupported, Failed
+    }
+
+    data class NfcFeedbackEvent(
+        val id: Long,
+        val status: NfcStatus,
+        val cardName: String? = null,
+        val balance: Int? = null
+    )
+
     data class JourneyStatItem(
         val label: String,
         val count: Int
@@ -30,6 +46,29 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
         val city: String,
         val count: Int
     )
+
+    private val _nfcFeedback = MutableStateFlow<NfcFeedbackEvent?>(null)
+    val nfcFeedback: StateFlow<NfcFeedbackEvent?> = _nfcFeedback.asStateFlow()
+
+    fun notifyNfcReading() {
+        _nfcFeedback.value = NfcFeedbackEvent(id = System.nanoTime(), status = NfcStatus.Reading)
+    }
+
+    fun notifyNfcTagLost() {
+        _nfcFeedback.value = NfcFeedbackEvent(id = System.nanoTime(), status = NfcStatus.TagLost)
+    }
+
+    fun notifyNfcUnsupported() {
+        _nfcFeedback.value = NfcFeedbackEvent(id = System.nanoTime(), status = NfcStatus.Unsupported)
+    }
+
+    fun notifyNfcFailed() {
+        _nfcFeedback.value = NfcFeedbackEvent(id = System.nanoTime(), status = NfcStatus.Failed)
+    }
+
+    fun clearNfcFeedback() {
+        _nfcFeedback.value = null
+    }
 
     // 从数据库读取的所有卡片，并转换为 StateFlow 供 Compose 监听
     val cards: StateFlow<List<TransitCard>> = cardDao.getAllCards()
@@ -46,8 +85,7 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
 
     private fun refreshLegacyStationNames() {
         viewModelScope.launch(Dispatchers.IO) {
-            // Delay heavy DB scan to keep cold-start transitions smooth.
-            delay(3500)
+            StationResolver.awaitReady()
             val allCards = cardDao.getAllCardsList()
             allCards.forEach { card ->
                 val trips = cardDao.getTripsListForCard(card.idm)
@@ -112,13 +150,15 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
 
             val existingTrips = cardDao.getTripsListForCard(testIdm)
             if (existingTrips.isNotEmpty()) {
+                val legacySeedTitles = setOf("充值", "地铁/电车", "公交", "地铁")
                 val migrated = existingTrips.map { trip ->
                     if (!trip.blockHex.startsWith("SEED-")) {
                         trip
                     } else {
                         trip.copy(
                             inStationName = normalizeSeedStationName(trip.inStationName),
-                            outStationName = normalizeSeedStationName(trip.outStationName)
+                            outStationName = normalizeSeedStationName(trip.outStationName),
+                            customTitle = if (trip.customTitle in legacySeedTitles) null else trip.customTitle
                         )
                     }
                 }
@@ -162,14 +202,14 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
             }
 
             // Oldest -> newest. Amount < 0 means fare/purchase, > 0 means charge.
-            addTrip(daysAgo = 3, minuteOffset = -620, type = 0x02, amount = 1000, inName = "両国 (JR東日本 総武線)", title = "充值")
-            addTrip(daysAgo = 3, minuteOffset = -570, type = 0x01, amount = -178, inName = "両国 (JR東日本 総武線)", outName = "秋葉原 (JR東日本 山手線)", title = "地铁/电车")
-            addTrip(daysAgo = 2, minuteOffset = -520, type = 0x0F, amount = -210, inName = "上野", outName = "浅草橋", title = "公交")
-            addTrip(daysAgo = 2, minuteOffset = -470, type = 0x01, amount = -165, inName = "浅草 (東京メトロ 銀座線)", outName = "銀座 (東京メトロ 銀座線)", title = "地铁")
-            addTrip(daysAgo = 1, minuteOffset = -430, type = 0x02, amount = 500, inName = "新宿 (JR東日本 山手線)", title = "充值")
-            addTrip(daysAgo = 1, minuteOffset = -390, type = 0x01, amount = -220, inName = "新宿 (都営 新宿線)", outName = "九段下 (都営 新宿線)", title = "地铁")
-            addTrip(daysAgo = 0, minuteOffset = -180, type = 0x01, amount = -155, inName = "両国 (JR東日本 総武線)", outName = "浅草橋 (JR東日本 総武線)", title = "地铁/电车")
-            addTrip(daysAgo = 0, minuteOffset = -120, type = 0x0D, amount = -195, inName = "東京", outName = "お台場海浜公園", title = "公交")
+            addTrip(daysAgo = 3, minuteOffset = -620, type = 0x02, amount = 1000, inName = "両国 (JR東日本 総武線)")
+            addTrip(daysAgo = 3, minuteOffset = -570, type = 0x01, amount = -178, inName = "両国 (JR東日本 総武線)", outName = "秋葉原 (JR東日本 山手線)")
+            addTrip(daysAgo = 2, minuteOffset = -520, type = 0x0F, amount = -210, inName = "上野", outName = "浅草橋")
+            addTrip(daysAgo = 2, minuteOffset = -470, type = 0x01, amount = -165, inName = "浅草 (東京メトロ 銀座線)", outName = "銀座 (東京メトロ 銀座線)")
+            addTrip(daysAgo = 1, minuteOffset = -430, type = 0x02, amount = 500, inName = "新宿 (JR東日本 山手線)")
+            addTrip(daysAgo = 1, minuteOffset = -390, type = 0x01, amount = -220, inName = "新宿 (都営 新宿線)", outName = "九段下 (都営 新宿線)")
+            addTrip(daysAgo = 0, minuteOffset = -180, type = 0x01, amount = -155, inName = "両国 (JR東日本 総武線)", outName = "浅草橋 (JR東日本 総武線)")
+            addTrip(daysAgo = 0, minuteOffset = -120, type = 0x0D, amount = -195, inName = "東京", outName = "お台場海浜公園")
 
             var balanceCursor = 2400
             val balancedTrips = seedTrips
@@ -207,31 +247,95 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
 
     fun saveCard(suicaData: FeliCaParser.SuicaData) {
         viewModelScope.launch(Dispatchers.IO) {
+            StationResolver.awaitReady()
             val idmHex = suicaData.idm.joinToString("") { "%02X".format(it) }
-            val card = TransitCard(
-                idm = idmHex,
-                nickname = "Suica Card",
-                balance = suicaData.balance,
-                themeColor = 0xFF4CAF50, // 默认使用绿色
-                lastUpdated = System.currentTimeMillis()
-            )
-            
-            // 保存或更新卡片信息到本地数据库
-            cardDao.insertCard(card)
+            val existingCard = cardDao.getCardByIdm(idmHex)
+            val now = System.currentTimeMillis()
+            val cardName: String
 
-            val tripRecords = mutableListOf<com.example.suicareader.data.db.entity.TripRecord>()
-            val format = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+            if (existingCard != null) {
+                cardName = existingCard.nickname
+                cardDao.updateCard(
+                    existingCard.copy(
+                        balance = suicaData.balance,
+                        lastUpdated = now
+                    )
+                )
+            } else {
+                cardName = "Suica Card"
+                cardDao.insertCard(
+                    TransitCard(
+                        idm = idmHex,
+                        nickname = cardName,
+                        balance = suicaData.balance,
+                        themeColor = 0xFF4CAF50,
+                        lastUpdated = now
+                    )
+                )
+            }
 
-            for (i in suicaData.history.indices) {
+            val existingTrips = cardDao.getTripsListForCard(idmHex) // ASC (oldest -> newest)
+            val existingHexes = existingTrips.map { it.blockHex }.toHashSet()
+
+            val jstZone = TimeZone.getTimeZone("Asia/Tokyo")
+            val jstParser = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+                timeZone = jstZone
+                isLenient = false
+            }
+            val dayKeyFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+                timeZone = jstZone
+            }
+
+            // Track latest timestamp already present per JST calendar day so new same-day trips always sort newer.
+            val maxTimestampByDay = mutableMapOf<String, Long>()
+            existingTrips.forEach { trip ->
+                val dayKey = dayKeyFormat.format(java.util.Date(trip.timestamp))
+                val prev = maxTimestampByDay[dayKey]
+                if (prev == null || trip.timestamp > prev) {
+                    maxTimestampByDay[dayKey] = trip.timestamp
+                }
+            }
+
+            // Last trip recorded in DB before any newly scanned oldest block (helps avoid amount=0 on 20th item)
+            val scannedHexes = suicaData.history.mapTo(HashSet()) { it.blockHex }
+            val latestPreExistingBalance = existingTrips
+                .lastOrNull { it.blockHex !in scannedHexes }
+                ?.balance
+
+            // Compute amounts from newest -> oldest, then insert new records oldest -> newest
+            val recordsWithAmount = suicaData.history.indices.map { i ->
                 val parsed = suicaData.history[i]
-                val prevBalance = if (i + 1 < suicaData.history.size) suicaData.history[i + 1].balance else parsed.balance
-                val amount = parsed.balance - prevBalance
-                val timestamp = format.parse(parsed.dateString)?.time ?: 0L
+                val prevBalance = when {
+                    i + 1 < suicaData.history.size -> suicaData.history[i + 1].balance
+                    latestPreExistingBalance != null -> latestPreExistingBalance
+                    else -> parsed.balance
+                }
+                parsed to (parsed.balance - prevBalance)
+            }.reversed()
 
-                tripRecords.add(
+            val newRecords = mutableListOf<com.example.suicareader.data.db.entity.TripRecord>()
+            val todayKey = dayKeyFormat.format(java.util.Date(now))
+
+            for ((parsed, amount) in recordsWithAmount) {
+                if (parsed.blockHex in existingHexes) continue
+
+                val dateKey = parsed.dateString.takeIf { it.isNotBlank() } ?: todayKey
+                val parsedDate = runCatching { jstParser.parse(dateKey) }.getOrNull()
+                // Anchor to 12:00:00 JST so local timezone formatting never shifts the calendar date
+                val dayNoonMs = (parsedDate?.time ?: now) + 12L * 60L * 60L * 1000L
+
+                val currentDayMax = maxTimestampByDay[dateKey]
+                val assignedTs = if (currentDayMax == null) {
+                    dayNoonMs
+                } else {
+                    maxOf(dayNoonMs, currentDayMax + 1000L)
+                }
+                maxTimestampByDay[dateKey] = assignedTs
+
+                newRecords.add(
                     com.example.suicareader.data.db.entity.TripRecord(
                         cardIdm = idmHex,
-                        timestamp = timestamp,
+                        timestamp = assignedTs,
                         type = parsed.transactionType,
                         inStation = parsed.inStationCode,
                         outStation = parsed.outStationCode,
@@ -245,7 +349,17 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
                     )
                 )
             }
-            cardDao.insertTrips(tripRecords.reversed())
+
+            if (newRecords.isNotEmpty()) {
+                cardDao.insertTrips(newRecords)
+            }
+
+            _nfcFeedback.value = NfcFeedbackEvent(
+                id = System.nanoTime(),
+                status = NfcStatus.Success,
+                cardName = cardName,
+                balance = suicaData.balance
+            )
         }
     }
 
@@ -286,7 +400,7 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
             val currentCards = cards.value
             val card = currentCards.find { it.idm == idm } ?: return@launch
             
-            val blockHex = "MANUAL-${System.currentTimeMillis()}"
+            val blockHex = "MANUAL-${System.currentTimeMillis()}-${Random.nextInt(1000, 9999)}"
             
             val inCode = inStationCode.split("-").takeLast(2).joinToString("-")
             val outCode = outStationCode?.split("-")?.takeLast(2)?.joinToString("-") ?: ""

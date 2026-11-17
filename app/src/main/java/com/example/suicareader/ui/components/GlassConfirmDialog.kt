@@ -1,18 +1,27 @@
 package com.example.suicareader.ui.components
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.example.suicareader.ui.theme.LocalStrings
 
 @Composable
@@ -25,60 +34,44 @@ fun GlassConfirmDialog(
     onConfirmClick: () -> Unit
 ) {
     val strings = LocalStrings.current
-    Dialog(
-        onDismissRequest = onDismissRequest,
-        properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
-            usePlatformDefaultWidth = false
-        )
-    ) {
-        Box(
+    GlassOverlayContainer(onDismissRequest = onDismissRequest) {
+        GlassDialogPanel(
             modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.24f)),
-            contentAlignment = androidx.compose.ui.Alignment.Center
+                .fillMaxWidth(0.86f)
+                .widthIn(max = 460.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.85f)
-                    .clip(RoundedCornerShape(24.dp))
-                    .glassSurface(level = GlassLevel.Overlay, cornerRadius = 24.dp)
-                    .padding(24.dp)
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth()
+            Column(modifier = Modifier.fillMaxWidth().padding(24.dp)) {
+                Text(
+                    text = title,
+                    color = Color.White,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+
+                Text(
+                    text = message,
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontSize = 15.sp,
+                    lineHeight = 22.sp,
+                    modifier = Modifier.padding(bottom = 24.dp)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text(
-                        text = title,
-                        color = Color.White,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-
-                    Text(
-                        text = message,
-                        color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 16.sp,
-                        lineHeight = 24.sp,
-                        modifier = Modifier.padding(bottom = 24.dp)
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
+                    TextButton(onClick = onDismissRequest) {
+                        Text(strings.cancel, color = Color.White.copy(alpha = 0.78f))
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Box(
+                        modifier = Modifier
+                            .glassSurface(level = GlassLevel.DialogItem, cornerRadius = 14.dp)
+                            .clickable(onClick = onConfirmClick)
+                            .padding(horizontal = 20.dp, vertical = 10.dp)
                     ) {
-                        TextButton(onClick = onDismissRequest) {
-                            Text(strings.cancel, color = Color.White.copy(alpha = 0.78f))
-                        }
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Button(
-                            onClick = onConfirmClick,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.2f))
-                        ) {
-                            Text(confirmText, color = confirmColor, fontWeight = FontWeight.Bold)
-                        }
+                        Text(confirmText, color = confirmColor, fontWeight = FontWeight.Bold)
                     }
                 }
             }

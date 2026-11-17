@@ -1,16 +1,25 @@
 package com.example.suicareader.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -19,8 +28,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 
 @Composable
 fun GlassMenuDialog(
@@ -31,63 +38,41 @@ fun GlassMenuDialog(
     editText: String = "Edit Card",
     deleteText: String = "Delete Card"
 ) {
-    Dialog(
-        onDismissRequest = onDismissRequest,
-        properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
-            usePlatformDefaultWidth = false
-        )
-    ) {
-        Box(
+    GlassOverlayContainer(onDismissRequest = onDismissRequest) {
+        GlassDialogPanel(
             modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.24f)),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth(0.86f)
+                .widthIn(max = 440.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.85f)
-                    .clip(RoundedCornerShape(24.dp))
-                    .glassSurface(level = GlassLevel.Overlay, cornerRadius = 24.dp)
-                    .padding(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = title,
-                        color = Color.White,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 16.dp, start = 8.dp)
-                    )
+            Column(modifier = Modifier.fillMaxWidth().padding(18.dp)) {
+                Text(
+                    text = title,
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 16.dp, start = 6.dp)
+                )
 
-                    // 菜单项：编辑
-                    GlassMenuItem(
-                        icon = Icons.Default.Edit,
-                        text = editText,
-                        textColor = Color.White.copy(alpha = 0.9f),
-                        iconColor = Color.White.copy(alpha = 0.9f),
-                        onClick = {
-                            onEditClick()
-                        }
-                    )
+                GlassMenuItem(
+                    icon = Icons.Default.Edit,
+                    text = editText,
+                    textColor = Color.White.copy(alpha = 0.94f),
+                    iconColor = Color.White.copy(alpha = 0.94f),
+                    onClick = onEditClick
+                )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
-                    // 菜单项：删除
-                    GlassMenuItem(
-                        icon = Icons.Default.Delete,
-                        text = deleteText,
-                        textColor = Color(0xFFFF5252), // 红色警示
-                        iconColor = Color(0xFFFF5252),
-                        onClick = {
-                            onDeleteClick()
-                            onDismissRequest()
-                        }
-                    )
-                }
+                GlassMenuItem(
+                    icon = Icons.Default.Delete,
+                    text = deleteText,
+                    textColor = Color(0xFFFF6B6B),
+                    iconColor = Color(0xFFFF6B6B),
+                    onClick = {
+                        onDeleteClick()
+                        onDismissRequest()
+                    }
+                )
             }
         }
     }
@@ -104,19 +89,18 @@ fun GlassMenuItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .glassSurface(level = GlassLevel.SurfaceSecondary, cornerRadius = 16.dp)
+            .glassSurface(level = GlassLevel.DialogItem, cornerRadius = 16.dp)
             .clickable(onClick = onClick)
-            .padding(vertical = 16.dp, horizontal = 16.dp),
+            .padding(vertical = 15.dp, horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             tint = iconColor,
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier.size(22.dp)
         )
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(14.dp))
         Text(
             text = text,
             color = textColor,

@@ -8,7 +8,9 @@ import org.json.JSONObject
 object TransitMapCatalog {
     @Volatile
     private var initialized = false
+    @Volatile
     private var stationCoordinates: Map<String, LatLng> = emptyMap()
+    @Volatile
     private var stationCompanyOverrides: Map<String, LatLng> = emptyMap()
 
     private val companyColors = mapOf(

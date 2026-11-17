@@ -9,7 +9,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,10 +20,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.Apartment
@@ -35,14 +36,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -58,8 +57,13 @@ import com.example.suicareader.ui.components.GlassCard
 import com.example.suicareader.ui.components.GlassLevel
 import com.example.suicareader.ui.components.glassSurface
 import com.example.suicareader.ui.map.TransitMapCatalog
+import com.example.suicareader.ui.theme.LocalAppBackdrop
 import com.example.suicareader.ui.theme.LocalStrings
 import com.example.suicareader.ui.theme.LocalTextColor
+import com.kyant.backdrop.Backdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.DirectionsRailway
@@ -97,8 +101,12 @@ fun JourneyScreen(viewModel: MainViewModel) {
     val textColor = LocalTextColor.current
     val context = androidx.compose.ui.platform.LocalContext.current
     val cards by viewModel.cards.collectAsState()
-    val selectedCardIds = remember(cards) { mutableStateListOf<String>().apply { addAll(cards.map { it.idm }) } }
-    val trips by viewModel.getTripsForCards(selectedCardIds.toList()).collectAsState(initial = emptyList())
+    var deselectedCardIds by rememberSaveable { mutableStateOf(emptySet<String>()) }
+    val selectedCardIds = remember(cards, deselectedCardIds) {
+        cards.map { it.idm }.filter { it !in deselectedCardIds }
+    }
+    val tripsFlow = remember(selectedCardIds) { viewModel.getTripsForCards(selectedCardIds) }
+    val trips by tripsFlow.collectAsState(initial = emptyList())
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(LatLng(36.2048, 138.2529), 4.8f)
     }
@@ -136,7 +144,9 @@ fun JourneyScreen(viewModel: MainViewModel) {
     }
 
     LaunchedEffect(Unit) {
-        TransitMapCatalog.init(context)
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            TransitMapCatalog.init(context.applicationContext)
+        }
     }
 
     LaunchedEffect(selectedCity) {
@@ -160,9 +170,23 @@ fun JourneyScreen(viewModel: MainViewModel) {
         )
     }
 
-    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
-        Text(strings.journeyTitle, color = textColor, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(8.dp))
+    val appBackdrop = LocalAppBackdrop.current
+    val mapContentBackdrop = rememberLayerBackdrop()
+    val dropdownBackdrop = if (appBackdrop != null) {
+        rememberCombinedBackdrop(appBackdrop, mapContentBackdrop)
+    } else {
+        mapContentBackdrop
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 92.dp)
+    ) {
+        Text(strings.journeyTitle, color = textColor, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(10.dp))
 
         Box(
             modifier = Modifier
@@ -172,7 +196,7 @@ fun JourneyScreen(viewModel: MainViewModel) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val chipGap = 10.dp
                 val halfChipColumnWidth = (maxWidth - chipGap) / 2
-                Column(modifier = Modifier.fillMaxSize()) {
+                Column(modifier = Modifier.fillMaxSize().layerBackdrop(mapContentBackdrop)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(chipGap),
@@ -308,17 +332,19 @@ fun JourneyScreen(viewModel: MainViewModel) {
                         .padding(top = 52.dp)
                         .width(halfChipColumnWidth)
                         .zIndex(2f),
-                    visible = showCardDropdown
+                    visible = showCardDropdown,
+                    backdrop = dropdownBackdrop
                 ) {
                     cards.forEach { card ->
+                        val isSelected = selectedCardIds.contains(card.idm)
                         GlassCheckboxRow(
                             label = card.nickname,
-                            checked = selectedCardIds.contains(card.idm),
+                            checked = isSelected,
                             onCheckedChange = { checked ->
                                 if (checked) {
-                                    if (!selectedCardIds.contains(card.idm)) selectedCardIds.add(card.idm)
+                                    deselectedCardIds = deselectedCardIds - card.idm
                                 } else if (selectedCardIds.size > 1) {
-                                    selectedCardIds.remove(card.idm)
+                                    deselectedCardIds = deselectedCardIds + card.idm
                                 }
                             }
                         )
@@ -332,7 +358,8 @@ fun JourneyScreen(viewModel: MainViewModel) {
                         .offset(x = halfChipColumnWidth + chipGap)
                         .width(halfChipColumnWidth)
                         .zIndex(2f),
-                    visible = showCityDropdown
+                    visible = showCityDropdown,
+                    backdrop = dropdownBackdrop
                 ) {
                     cityOptions.forEach { option ->
                         GlassCheckboxRow(
@@ -414,8 +441,7 @@ private fun JourneyFilterChip(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
-            .glassSurface(level = GlassLevel.Overlay, cornerRadius = 18.dp)
-            .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(18.dp))
+            .glassSurface(level = GlassLevel.SurfaceSecondary, cornerRadius = 18.dp, isPressed = expanded)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -445,6 +471,7 @@ private fun JourneyFilterChip(
 private fun FloatingDropdownMenu(
     modifier: Modifier = Modifier,
     visible: Boolean,
+    backdrop: Backdrop? = null,
     content: @Composable () -> Unit
 ) {
     AnimatedVisibility(
@@ -461,26 +488,18 @@ private fun FloatingDropdownMenu(
             ),
         modifier = modifier
     ) {
-        Box {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .blur(22.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color.White.copy(alpha = 0.12f))
-            )
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(16.dp))
-                    .glassSurface(level = GlassLevel.Overlay, cornerRadius = 16.dp)
-                    .background(Color(0xAA534856))
-                    .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(16.dp))
-                    .heightIn(max = 220.dp)
-                    .padding(vertical = 6.dp)
-            ) {
-                LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                    item { content() }
-                }
+        Box(
+            modifier = Modifier
+                .glassSurface(
+                    level = GlassLevel.Overlay,
+                    cornerRadius = 18.dp,
+                    backdropOverride = backdrop
+                )
+                .heightIn(max = 220.dp)
+                .padding(vertical = 6.dp)
+        ) {
+            LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                item { content() }
             }
         }
     }
@@ -522,12 +541,12 @@ private fun JourneyCountCard(
         targetValue = if (active) 0.96f else 0.76f,
         label = "journeyCountCardIconAlpha"
     )
-    val unitSuffix = if (isCompanyCard) "家" else "个"
+    val strings = LocalStrings.current
+    val unitSuffix = if (isCompanyCard) strings.unitStations else strings.unitCities
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .glassSurface(level = GlassLevel.SurfaceSecondary, cornerRadius = 20.dp)
+            .glassSurface(level = GlassLevel.SurfaceSecondary, cornerRadius = 20.dp, isPressed = active)
             .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
         Row(

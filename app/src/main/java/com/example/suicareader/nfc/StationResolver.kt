@@ -2,18 +2,28 @@ package com.example.suicareader.nfc
 
 import android.content.Context
 import com.atilika.kuromoji.ipadic.Tokenizer
+import kotlinx.coroutines.CompletableDeferred
 import org.json.JSONObject
 import java.io.InputStreamReader
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 object StationResolver {
+    @Volatile
+    private var initialized = false
+    @Volatile
     private var stations: Map<String, String>? = null
+    @Volatile
     private var stationMetaByKey: Map<String, StationMeta>? = null
+    @Volatile
     private var stationSearchAliasesByName: Map<String, Set<String>>? = null
-    
+
+    private val readySignal = CompletableDeferred<Unit>()
+    private val initLock = Any()
+
     // Kuromoji is heavyweight; build lazily and cache romaji fallbacks per station name.
     private val kuromojiTokenizer: Tokenizer by lazy { Tokenizer() }
-    private val stationRomajiCache: MutableMap<String, String> = mutableMapOf()
+    private val stationRomajiCache = ConcurrentHashMap<String, String>()
 
     private data class StationMeta(
         val stationName: String,
@@ -47,29 +57,52 @@ object StationResolver {
     )
 
     fun init(context: Context) {
-        if (stations != null) return
-        try {
-            context.assets.open("stations.json").use { inputStream ->
-                InputStreamReader(inputStream, "UTF-8").use { reader ->
-                    val jsonStr = reader.readText()
-                    val jsonObject = JSONObject(jsonStr)
-                    val map = mutableMapOf<String, String>()
-                    val keys = jsonObject.keys()
-                    while (keys.hasNext()) {
-                        val key = keys.next()
-                        map[key] = jsonObject.getString(key)
+        if (initialized) return
+        val appContext = context.applicationContext
+        synchronized(initLock) {
+            if (initialized) return
+            try {
+                appContext.assets.open("stations.json").use { inputStream ->
+                    InputStreamReader(inputStream, "UTF-8").use { reader ->
+                        val jsonStr = reader.readText()
+                        val jsonObject = JSONObject(jsonStr)
+                        val map = mutableMapOf<String, String>()
+                        val keys = jsonObject.keys()
+                        while (keys.hasNext()) {
+                            val key = keys.next()
+                            map[key] = jsonObject.getString(key)
+                        }
+                        stations = map
                     }
-                    stations = map
                 }
+                stationMetaByKey = loadStationMeta(appContext)
+                // Build fast non-Kuromoji aliases immediately so startup stays snappy
+                stationSearchAliasesByName = buildStationSearchAliases(includeKuromoji = false)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                if (stations == null) stations = emptyMap()
+                if (stationMetaByKey == null) stationMetaByKey = emptyMap()
+                if (stationSearchAliasesByName == null) stationSearchAliasesByName = emptyMap()
+            } finally {
+                initialized = true
+                readySignal.complete(Unit)
             }
-            stationMetaByKey = loadStationMeta(context)
-            stationSearchAliasesByName = buildStationSearchAliases()
-        } catch (e: Exception) {
-            e.printStackTrace()
-            stations = emptyMap()
-            stationMetaByKey = emptyMap()
-            stationSearchAliasesByName = emptyMap()
         }
+    }
+
+    /**
+     * Pre-warms heavy Kuromoji romaji aliases in background after core station maps are ready.
+     */
+    fun warmSearchIndex() {
+        if (!initialized) return
+        val enriched = buildStationSearchAliases(includeKuromoji = true)
+        if (enriched.isNotEmpty()) {
+            stationSearchAliasesByName = enriched
+        }
+    }
+
+    suspend fun awaitReady() {
+        readySignal.await()
     }
 
     fun getStationName(regionCode: Int?, lineCode: Int, stationCode: Int): String? {
@@ -277,7 +310,7 @@ object StationResolver {
             .toList()
     }
 
-    private fun buildStationSearchAliases(): Map<String, Set<String>> {
+    private fun buildStationSearchAliases(includeKuromoji: Boolean = true): Map<String, Set<String>> {
         val values = stations?.values ?: return emptyMap()
         val index = mutableMapOf<String, MutableSet<String>>()
         values.forEach { display ->
@@ -290,7 +323,7 @@ object StationResolver {
             val romaji = kanaToRomaji(station)
             if (romaji.isNotBlank()) {
                 aliases.add(normalizeSearchText(romaji))
-            } else {
+            } else if (includeKuromoji) {
                 // For pure Kanji station names, kanaToRomaji returns empty.
                 // Use Kuromoji reading to build a romaji fallback.
                 val fallbackRomaji = kuromojiStationToRomaji(station)
