@@ -1,9 +1,9 @@
 package com.example.suicareader.ui.screens
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -19,8 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -32,6 +31,8 @@ import com.example.suicareader.ui.components.GlassDialogPanel
 import com.example.suicareader.ui.components.GlassLevel
 import com.example.suicareader.ui.components.GlassMenuDialog
 import com.example.suicareader.ui.components.GlassOverlayContainer
+import com.example.suicareader.ui.components.StationCompanyPickerDialog
+import com.example.suicareader.ui.components.StationPickerDialog
 import com.example.suicareader.ui.components.TripUiFormatter
 import com.example.suicareader.ui.components.glassOutlinedTextFieldColors
 import com.example.suicareader.ui.components.glassSurface
@@ -58,7 +59,17 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 fun TripDetailsScreen(
     trip: TripRecord?,
-    onSaveEdit: (TripRecord, String, String, Long, Int) -> Unit,
+    onSaveEdit: (
+        TripRecord,
+        String,
+        String,
+        Long,
+        Int,
+        String,
+        String?,
+        String,
+        String?
+    ) -> Unit,
     onDeleteTrip: (TripRecord) -> Unit,
     onBackClick: () -> Unit
 ) {
@@ -76,6 +87,14 @@ fun TripDetailsScreen(
     var showDatePickerDialog by remember { mutableStateOf(false) }
     var editingNote by remember(trip?.id, showEditDialog, showNoteDialog) { mutableStateOf(trip?.note ?: "") }
     var editValidationMessage by remember(trip?.id, showEditDialog) { mutableStateOf<String?>(null) }
+    var editingInStationCode by remember(trip?.id, showEditDialog) { mutableStateOf(trip?.inStation ?: "") }
+    var editingInStationName by remember(trip?.id, showEditDialog) { mutableStateOf(trip?.inStationName) }
+    var editingOutStationCode by remember(trip?.id, showEditDialog) { mutableStateOf(trip?.outStation ?: "") }
+    var editingOutStationName by remember(trip?.id, showEditDialog) { mutableStateOf(trip?.outStationName) }
+    var pickingStationFor by remember { mutableStateOf<String?>(null) }
+    var pendingStationName by remember { mutableStateOf<String?>(null) }
+    var pendingStationFor by remember { mutableStateOf<String?>(null) }
+    var isMapTouched by remember { mutableStateOf(false) }
 
     val inStationText = trip?.inStationName ?: trip?.inStation
     val outStationText = trip?.outStationName ?: trip?.outStation
@@ -87,22 +106,7 @@ fun TripDetailsScreen(
     val lineColor = remember(lineCompany) { TransitMapCatalog.colorForCompany(lineCompany) }
     val cameraPositionState = rememberCameraPositionState()
     var showMapContent by remember(trip?.id) { mutableStateOf(false) }
-    var stretchOffset by remember { mutableStateOf(0f) }
-    val animatedStretch by animateFloatAsState(
-        targetValue = stretchOffset,
-        animationSpec = Motion.RubberBandLight,
-        label = "trip_limit_stretch"
-    )
     val noteLength = trip?.note?.length ?: 0
-    val notePressure = (noteLength / 180f).coerceIn(0f, 1f)
-    val mapWeight by animateFloatAsState(
-        targetValue = (3.6f - notePressure * 1.6f).coerceIn(2.0f, 3.6f),
-        label = "trip_map_weight"
-    )
-    val detailsWeight by animateFloatAsState(
-        targetValue = 1.9f + notePressure * 0.6f,
-        label = "trip_details_weight"
-    )
 
     val appBackdrop = LocalAppBackdrop.current
     val pageBackdrop = rememberLayerBackdrop()
@@ -142,38 +146,16 @@ fun TripDetailsScreen(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                detectVerticalDragGestures(
-                    onVerticalDrag = { _, dragAmount ->
-                        val next = (stretchOffset + dragAmount * 0.2f).coerceIn(-56f, 56f)
-                        stretchOffset = next
-                    },
-                    onDragEnd = { stretchOffset = 0f },
-                    onDragCancel = { stretchOffset = 0f }
-                )
-            }
-    ) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val mapCardHeight = (maxHeight * 0.40f).coerceIn(240.dp, 360.dp)
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .layerBackdrop(pageBackdrop)
+                .verticalScroll(rememberScrollState(), enabled = !isMapTouched)
                 .statusBarsPadding()
                 .navigationBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
-                .graphicsLayer {
-                    val offsetAbs = kotlin.math.abs(animatedStretch)
-                    val stretchScale = 1f + (offsetAbs / 1800f)
-                    scaleY = stretchScale
-                    translationY = animatedStretch * 0.12f
-                    transformOrigin = if (animatedStretch >= 0f) {
-                        TransformOrigin(0.5f, 0f)
-                    } else {
-                        TransformOrigin(0.5f, 1f)
-                    }
-                }
         ) {
             Row(
                 modifier = Modifier
@@ -205,11 +187,27 @@ fun TripDetailsScreen(
             GlassCard(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(mapWeight),
+                    .height(mapCardHeight),
                 level = GlassLevel.SurfacePrimary,
                 onClick = {}
             ) {
-                Box(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            awaitEachGesture {
+                                awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                                isMapTouched = true
+                                try {
+                                    do {
+                                        val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                                    } while (event.changes.any { it.pressed })
+                                } finally {
+                                    isMapTouched = false
+                                }
+                            }
+                        }
+                ) {
                     if (showMapContent) {
                         GoogleMap(
                             modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp)),
@@ -222,20 +220,24 @@ fun TripDetailsScreen(
                             )
                         ) {
                             if (startLatLng != null) {
-                                Marker(
-                                    state = startMarkerState!!,
-                                    title = strings.start,
-                                    snippet = inStationText,
-                                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
-                                )
+                                key(startLatLng) {
+                                    Marker(
+                                        state = startMarkerState!!,
+                                        title = strings.start,
+                                        snippet = inStationText,
+                                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+                                    )
+                                }
                             }
                             if (endLatLng != null) {
-                                Marker(
-                                    state = endMarkerState!!,
-                                    title = strings.end,
-                                    snippet = outStationText,
-                                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)
-                                )
+                                key(endLatLng) {
+                                    Marker(
+                                        state = endMarkerState!!,
+                                        title = strings.end,
+                                        snippet = outStationText,
+                                        icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)
+                                    )
+                                }
                             }
                             if (startLatLng != null && endLatLng != null) {
                                 Polyline(
@@ -286,9 +288,7 @@ fun TripDetailsScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             GlassCard(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(detailsWeight),
+                modifier = Modifier.fillMaxWidth(),
                 level = GlassLevel.SurfaceSecondary,
                 onClick = {}
             ) {
@@ -346,10 +346,10 @@ fun TripDetailsScreen(
                 Text(
                     text = trip?.note?.takeIf { it.isNotBlank() } ?: strings.noNote,
                     color = Color.White.copy(alpha = 0.88f),
-                    fontSize = 13.sp,
-                    maxLines = if (noteLength > 180) 4 else 2
+                    fontSize = 13.sp
                 )
             }
+            Spacer(modifier = Modifier.height(16.dp))
         }
 
         CompositionLocalProvider(LocalOverlayBackdrop provides appBackdrop) {
@@ -391,6 +391,7 @@ fun TripDetailsScreen(
                         modifier = Modifier
                             .fillMaxWidth(0.9f)
                             .widthIn(max = 520.dp)
+                            .heightIn(max = 680.dp)
                     ) {
                         Column(
                             modifier = Modifier
@@ -443,6 +444,51 @@ fun TripDetailsScreen(
                                 colors = glassOutlinedTextFieldColors(textColor, unfocusedBorderAlpha = 0.35f),
                                 modifier = Modifier.fillMaxWidth()
                             )
+                            val inDisplayValue = editingInStationName?.takeIf { it.isNotBlank() }
+                                ?: editingInStationCode.takeIf { it.isNotBlank() }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .glassSurface(level = GlassLevel.DialogItem, cornerRadius = 14.dp)
+                                    .clickable { pickingStationFor = "IN" }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        if (trip.type == 0x01) strings.inShortLabel else strings.locationShortLabel,
+                                        color = textColor.copy(alpha = 0.6f)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = inDisplayValue ?: strings.selectInStation,
+                                        color = if (inDisplayValue == null) textColor.copy(alpha = 0.6f) else textColor
+                                    )
+                                }
+                            }
+                            if (trip.type == 0x01 || !editingOutStationName.isNullOrBlank() || editingOutStationCode.isNotBlank()) {
+                                val outDisplayValue = editingOutStationName?.takeIf { it.isNotBlank() }
+                                    ?: editingOutStationCode.takeIf { it.isNotBlank() }
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .glassSurface(level = GlassLevel.DialogItem, cornerRadius = 14.dp)
+                                        .clickable { pickingStationFor = "OUT" }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(strings.outShortLabel, color = textColor.copy(alpha = 0.6f))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = outDisplayValue ?: strings.selectOutStation,
+                                            color = if (outDisplayValue == null) textColor.copy(alpha = 0.6f) else textColor
+                                        )
+                                    }
+                                }
+                            }
                             editValidationMessage?.let { message ->
                                 Text(
                                     text = message,
@@ -465,7 +511,11 @@ fun TripDetailsScreen(
                                                 editingTitle,
                                                 trip.note ?: "",
                                                 selectedEditDateMillis,
-                                                parsedAmount
+                                                parsedAmount,
+                                                editingInStationCode,
+                                                editingInStationName,
+                                                editingOutStationCode,
+                                                editingOutStationName
                                             )
                                             showEditDialog = false
                                         }
@@ -513,7 +563,11 @@ fun TripDetailsScreen(
                                             trip.customTitle ?: "",
                                             editingNote,
                                             trip.timestamp,
-                                            trip.amount
+                                            trip.amount,
+                                            trip.inStation,
+                                            trip.inStationName,
+                                            trip.outStation,
+                                            trip.outStationName
                                         )
                                         showNoteDialog = false
                                     },
@@ -527,6 +581,45 @@ fun TripDetailsScreen(
                         }
                     }
                 }
+            }
+
+            if (pickingStationFor != null) {
+                StationPickerDialog(
+                    onDismiss = { pickingStationFor = null },
+                    onStationSelected = { stationName ->
+                        pendingStationName = stationName
+                        pendingStationFor = pickingStationFor
+                        pickingStationFor = null
+                    }
+                )
+            }
+
+            if (pendingStationName != null && pendingStationFor != null) {
+                StationCompanyPickerDialog(
+                    stationName = pendingStationName!!,
+                    onDismiss = {
+                        pendingStationName = null
+                        pendingStationFor = null
+                    },
+                    onCompanySelected = { companyOption ->
+                        val stationName = pendingStationName!!
+                        val code = companyOption?.stationCode ?: stationName
+                        val displayName = if (companyOption == null) {
+                            stationName
+                        } else {
+                            "$stationName (${companyOption.companyShortName})"
+                        }
+                        if (pendingStationFor == "IN") {
+                            editingInStationCode = code
+                            editingInStationName = displayName
+                        } else {
+                            editingOutStationCode = code
+                            editingOutStationName = displayName
+                        }
+                        pendingStationName = null
+                        pendingStationFor = null
+                    }
+                )
             }
         }
     }

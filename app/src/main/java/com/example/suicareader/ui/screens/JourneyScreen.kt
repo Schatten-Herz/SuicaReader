@@ -27,7 +27,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
@@ -46,6 +48,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -178,21 +184,26 @@ fun JourneyScreen(viewModel: MainViewModel) {
         mapContentBackdrop
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .navigationBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 92.dp)
-    ) {
-        Text(strings.journeyTitle, color = textColor, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(10.dp))
+    var isMapTouched by remember { mutableStateOf(false) }
 
-        Box(
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val mapAreaHeight = (maxHeight * 0.44f).coerceIn(280.dp, 400.dp)
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .weight(1.1f)
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState(), enabled = !isMapTouched)
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 108.dp)
         ) {
+            Text(strings.journeyTitle, color = textColor, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(mapAreaHeight)
+            ) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val chipGap = 10.dp
                 val halfChipColumnWidth = (maxWidth - chipGap) / 2
@@ -241,7 +252,24 @@ fun JourneyScreen(viewModel: MainViewModel) {
                         level = GlassLevel.SurfacePrimary,
                         onClick = {}
                     ) {
-                        Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(16.dp))) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(16.dp))
+                                .pointerInput(Unit) {
+                                    awaitEachGesture {
+                                        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                                        isMapTouched = true
+                                        try {
+                                            do {
+                                                val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+                                            } while (event.changes.any { it.pressed })
+                                        } finally {
+                                            isMapTouched = false
+                                        }
+                                    }
+                                }
+                        ) {
                             GoogleMap(
                                 modifier = Modifier.fillMaxSize(),
                                 cameraPositionState = cameraPositionState,
@@ -379,9 +407,7 @@ fun JourneyScreen(viewModel: MainViewModel) {
         Spacer(modifier = Modifier.height(12.dp))
 
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
+            modifier = Modifier.fillMaxWidth()
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -412,14 +438,13 @@ fun JourneyScreen(viewModel: MainViewModel) {
             Spacer(modifier = Modifier.height(10.dp))
 
             JourneyStatCard(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 title = strings.journeyTopCardTitle,
                 subtitle = if (analysisMode == AnalysisCompany) strings.journeyModeCompanies else strings.journeyTopCardSubtitle,
                 items = activeStats,
                 textColor = textColor
             )
+        }
         }
     }
 }

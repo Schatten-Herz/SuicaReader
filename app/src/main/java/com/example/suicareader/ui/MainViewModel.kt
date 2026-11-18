@@ -92,13 +92,7 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
                 if (trips.isEmpty()) return@forEach
 
                 val updatedTrips = trips.map { trip ->
-                    val refreshedIn = refreshNameFromCode(trip.inStation, trip.inStationName)
-                    val refreshedOut = refreshNameFromCode(trip.outStation, trip.outStationName)
-                    if (refreshedIn != trip.inStationName || refreshedOut != trip.outStationName) {
-                        trip.copy(inStationName = refreshedIn, outStationName = refreshedOut)
-                    } else {
-                        trip
-                    }
+                    redecodeTripFromBlockOrCode(trip)
                 }
 
                 if (updatedTrips != trips) {
@@ -108,14 +102,74 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
         }
     }
 
+    private fun isTwoPartHexCode(code: String): Boolean {
+        val parts = code.split("-")
+        return parts.size == 2 && parts.all { it.length == 2 && it.toIntOrNull(16) != null }
+    }
+
+    private fun redecodeTripFromBlockOrCode(trip: com.example.suicareader.data.db.entity.TripRecord): com.example.suicareader.data.db.entity.TripRecord {
+        val hex = trip.blockHex
+        val needsBlockRedecode = isTwoPartHexCode(trip.inStation) ||
+            (trip.type == 0x01 && isTwoPartHexCode(trip.outStation)) ||
+            shouldRefreshStationName(trip.inStationName) ||
+            (trip.type == 0x01 && shouldRefreshStationName(trip.outStationName))
+
+        if (needsBlockRedecode && (trip.type == 0x01 || trip.type == 0x02) && hex.length == 32 && hex.all { it in '0'..'9' || it in 'A'..'F' || it in 'a'..'f' }) {
+            val bytes = ByteArray(16) { idx ->
+                hex.substring(idx * 2, idx * 2 + 2).toInt(16).toByte()
+            }
+            val inLine = bytes[6].toInt() and 0xFF
+            val inStation = bytes[7].toInt() and 0xFF
+            val outLine = bytes[8].toInt() and 0xFF
+            val outStation = bytes[9].toInt() and 0xFF
+            val byte15 = bytes[15].toInt() and 0xFF
+            val inRegion = (byte15 ushr 6) and 0x03
+            val outRegion = (byte15 ushr 4) and 0x03
+
+            val newInCode = String.format(Locale.US, "%02X-%02X-%02X", inRegion, inLine, inStation)
+            val newOutCode = String.format(Locale.US, "%02X-%02X-%02X", outRegion, outLine, outStation)
+            val newInName = StationResolver.getStationName(inRegion, inLine, inStation) ?: trip.inStationName
+            val newOutName = if (trip.type == 0x01) {
+                StationResolver.getStationName(outRegion, outLine, outStation) ?: trip.outStationName
+            } else {
+                trip.outStationName
+            }
+            return trip.copy(
+                inStation = newInCode,
+                outStation = if (trip.type == 0x01) newOutCode else trip.outStation,
+                inStationName = newInName,
+                outStationName = newOutName
+            )
+        }
+
+        val refreshedIn = refreshNameFromCode(trip.inStation, trip.inStationName)
+        val refreshedOut = refreshNameFromCode(trip.outStation, trip.outStationName)
+        return if (refreshedIn != trip.inStationName || refreshedOut != trip.outStationName) {
+            trip.copy(inStationName = refreshedIn, outStationName = refreshedOut)
+        } else {
+            trip
+        }
+    }
+
     private fun refreshNameFromCode(code: String, currentName: String?): String? {
         if (!shouldRefreshStationName(currentName)) return currentName
         val parts = code.split("-")
-        if (parts.size != 2) return currentName
-        val lineCode = parts[0].toIntOrNull(16) ?: return currentName
-        val stationCode = parts[1].toIntOrNull(16) ?: return currentName
-        return StationResolver.getStationName(regionCode = null, lineCode = lineCode, stationCode = stationCode)
-            ?: currentName
+        return when (parts.size) {
+            3 -> {
+                val regionCode = parts[0].toIntOrNull(16) ?: return currentName
+                val lineCode = parts[1].toIntOrNull(16) ?: return currentName
+                val stationCode = parts[2].toIntOrNull(16) ?: return currentName
+                StationResolver.getStationName(regionCode = regionCode, lineCode = lineCode, stationCode = stationCode)
+                    ?: currentName
+            }
+            2 -> {
+                val lineCode = parts[0].toIntOrNull(16) ?: return currentName
+                val stationCode = parts[1].toIntOrNull(16) ?: return currentName
+                StationResolver.getStationName(regionCode = null, lineCode = lineCode, stationCode = stationCode)
+                    ?: currentName
+            }
+            else -> currentName
+        }
     }
 
     private fun shouldRefreshStationName(name: String?): Boolean {
@@ -402,8 +456,8 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
             
             val blockHex = "MANUAL-${System.currentTimeMillis()}-${Random.nextInt(1000, 9999)}"
             
-            val inCode = inStationCode.split("-").takeLast(2).joinToString("-")
-            val outCode = outStationCode?.split("-")?.takeLast(2)?.joinToString("-") ?: ""
+            val inCode = inStationCode.split("-").takeLast(3).joinToString("-")
+            val outCode = outStationCode?.split("-")?.takeLast(3)?.joinToString("-") ?: ""
             
             val newTrip = com.example.suicareader.data.db.entity.TripRecord(
                 cardIdm = idm,
@@ -675,7 +729,11 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
         newTitle: String,
         newNote: String,
         newTimestamp: Long,
-        newAmount: Int
+        newAmount: Int,
+        newInStationCode: String = trip.inStation,
+        newInStationName: String? = trip.inStationName,
+        newOutStationCode: String = trip.outStation,
+        newOutStationName: String? = trip.outStationName
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             val shouldRecalculate = trip.amount != newAmount || trip.timestamp != newTimestamp
@@ -683,6 +741,10 @@ class MainViewModel(private val cardDao: CardDao) : ViewModel() {
                 trip.copy(
                     timestamp = newTimestamp,
                     amount = newAmount,
+                    inStation = newInStationCode,
+                    outStation = newOutStationCode,
+                    inStationName = newInStationName,
+                    outStationName = newOutStationName,
                     customTitle = newTitle.takeIf { it.isNotBlank() },
                     note = newNote.takeIf { it.isNotBlank() }
                 )

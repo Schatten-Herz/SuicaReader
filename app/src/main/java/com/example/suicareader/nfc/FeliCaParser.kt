@@ -164,12 +164,17 @@ object FeliCaParser {
             val inStation = block[7].toInt() and 0xFF
             val outLine = block[8].toInt() and 0xFF
             val outStation = block[9].toInt() and 0xFF
-            val inStationCode = String.format(Locale.US, "%02X-%02X", inLine, inStation)
-            val outStationCode = String.format(Locale.US, "%02X-%02X", outLine, outStation)
 
-            val regionCode = block[15].toInt() and 0xFF
-            val inStationName = StationResolver.getStationName(regionCode, inLine, inStation)
-            val outStationName = StationResolver.getStationName(regionCode, outLine, outStation)
+            // Byte 15 packs area/region codes: bits 7..6 = entry area, bits 5..4 = exit area
+            val byte15 = block[15].toInt() and 0xFF
+            val inRegionCode = (byte15 ushr 6) and 0x03
+            val outRegionCode = (byte15 ushr 4) and 0x03
+
+            val inStationCode = String.format(Locale.US, "%02X-%02X-%02X", inRegionCode, inLine, inStation)
+            val outStationCode = String.format(Locale.US, "%02X-%02X-%02X", outRegionCode, outLine, outStation)
+
+            val inStationName = StationResolver.getStationName(inRegionCode, inLine, inStation)
+            val outStationName = StationResolver.getStationName(outRegionCode, outLine, outStation)
 
             val blockHex = block.joinToString("") { "%02X".format(it) }
 

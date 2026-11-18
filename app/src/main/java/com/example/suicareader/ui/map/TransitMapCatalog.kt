@@ -34,6 +34,14 @@ object TransitMapCatalog {
         "東武鉄道" to Color(0xFF0D47A1),
         "相模鉄道" to Color(0xFF1A237E),
         "横浜市交通局" to Color(0xFF1976D2),
+        "横浜高速鉄道" to Color(0xFF00838F),
+        "東京モノレール" to Color(0xFF0288D1),
+        "東京臨海高速鉄道" to Color(0xFF00ACC1),
+        "北総鉄道" to Color(0xFF283593),
+        "新京成電鉄" to Color(0xFFEC407A),
+        "東葉高速鉄道" to Color(0xFF00897B),
+        "埼玉高速鉄道" to Color(0xFF1E88E5),
+        "首都圏新都市鉄道" to Color(0xFFD81B60),
 
         // Kansai major
         "大阪市高速電気軌道" to Color(0xFFE53935),
@@ -121,7 +129,23 @@ object TransitMapCatalog {
             else -> plainName
         }
         stationCompanyOverrides["$normalized|$company"]?.let { return it }
-        return stationCoordinates[normalized]
+        stationCoordinates[normalized]?.let { return it }
+
+        // Fallback normalization variants (full-width JR, small ヶ/ケ, trailing 駅)
+        val variants = buildList {
+            add(normalized.replace("ＪＲ", "JR"))
+            add(normalized.replace("JR", "ＪＲ"))
+            add(normalized.replace("ヶ", "ケ"))
+            add(normalized.replace("ケ", "ヶ"))
+            if (normalized.endsWith("駅") && normalized.length > 1) {
+                add(normalized.removeSuffix("駅"))
+            }
+        }
+        for (variant in variants) {
+            stationCompanyOverrides["$variant|$company"]?.let { return it }
+            stationCoordinates[variant]?.let { return it }
+        }
+        return null
     }
 
     fun companyName(rawName: String?): String {
